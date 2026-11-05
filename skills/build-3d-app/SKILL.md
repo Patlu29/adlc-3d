@@ -17,16 +17,16 @@ If the idea is empty or too vague to start, ask the user what the app is for, wh
 
 | Agent | Phase |
 |---|---|
-| `3d-web-application-builder:product-manager` | 1. Requirements |
-| `3d-web-application-builder:architect` | 2. Architecture and scaffold |
-| `3d-web-application-builder:ux-ui-designer` | 3. Design |
-| `3d-web-application-builder:technical-artist` | 4. Build |
-| `3d-web-application-builder:scene-developer` | 4. Build |
-| `3d-web-application-builder:frontend-developer` | 4. Build |
-| `3d-web-application-builder:backend-developer` | 4. Build (only if a backend is needed) |
-| `3d-web-application-builder:performance-optimiser` | 5. Performance |
-| `3d-web-application-builder:qa-engineer` | 6. QA |
-| `3d-web-application-builder:devops-engineer` | 7. Delivery |
+| `application-builder:product-manager` | 1. Requirements |
+| `application-builder:architect` | 2. Architecture and scaffold |
+| `application-builder:ux-ui-designer` | 3. Design |
+| `application-builder:technical-artist` | 4. Build |
+| `application-builder:scene-developer` | 4. Build |
+| `application-builder:frontend-developer` | 4. Build |
+| `application-builder:backend-developer` | 4. Build (only if a backend is needed) |
+| `application-builder:performance-optimiser` | 5. Performance |
+| `application-builder:qa-engineer` | 6. QA |
+| `application-builder:devops-engineer` | 7. Delivery |
 
 ## How to delegate
 
