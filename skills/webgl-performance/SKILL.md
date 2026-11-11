@@ -23,14 +23,36 @@ Use the targets in the requirements document if they differ.
 
 | Tool | Shows |
 |---|---|
-| `r3f-perf` (`<Perf />` inside the canvas, development only) | FPS, draw calls, triangles, GPU time, memory |
+| `r3f-perf` (`<Perf />` inside the canvas, development only), if the architect has installed it | FPS, draw calls, triangles, GPU time, memory |
 | `gl.info` from `useThree` | Draw calls, triangles, geometries and textures in memory |
 | Chrome DevTools Performance panel, with CPU throttling | Long frames, JavaScript cost, garbage collection |
 | Chrome DevTools Network panel, with network throttling | Download size and load order |
 | Lighthouse | Load performance and bundle issues |
 | `npx vite-bundle-visualizer` | What is inside the JavaScript bundle |
 
-Record every measurement with the device, browser, viewport and throttling used.
+To read figures from a running build, use the Playwright setup the qa-engineer created for the smoke test: run a short throwaway script from a temporary folder outside the project against the test build, and read `gl.info` through a scene query in the test hook. If the query you need is missing, request it from the scene developer. Do not commit measurement scripts or add packages.
+
+Record every measurement with the device, browser, build, viewport and throttling used. Measure the production build, not the dev server; development builds are much slower.
+
+### What you can and cannot measure here
+
+| Metric | In an automated or headless environment | Label |
+|---|---|---|
+| Bundle size, chunk sizes, asset sizes, first-view download | Reliable: read them from the build output and the network log | Verified |
+| Draw calls, triangles, geometries, textures | Reliable: read `gl.info` through the test hook or `r3f-perf` | Verified |
+| Memory growth over repeated actions | Reliable as a trend from `gl.info.memory` | Verified |
+| Frame rate, frame time, time to interactive | Not reliable: headless browsers render in software and run on a different CPU | Not verified, unless measured on a real GPU |
+
+For every target you cannot measure, write the exact steps for a person to measure it on a real mid-range laptop and phone, and list it under remaining issues. Do not turn draw calls and triangle counts into an estimated frame rate and report it as a result.
+
+### Find the bottleneck before choosing a fix
+
+| Test | If the frame rate improves | The limit is |
+|---|---|---|
+| Halve the canvas resolution (`dpr`) | Yes | GPU fill rate: fragment shaders, post-processing, overdraw, resolution |
+| Hide half the objects | Yes | Draw calls or vertex count |
+| Neither helps, and the Performance panel shows long scripting | | CPU: JavaScript in `useFrame`, React re-renders, raycasting |
+| Slow only at start | | Loading: download size, decoding, shader compilation |
 
 ## Fixes, in order of typical impact
 
@@ -66,15 +88,30 @@ Write `docs/performance.md`:
 # Performance report
 
 ## Test setup
-Device, browser, viewport, throttling
+Device, browser, build, viewport, throttling
 
 ## Results
-| Metric | Budget | Before | After |
-|---|---|---|---|
+| Metric | Target | Before | After | How measured | Label |
+|---|---|---|---|---|---|
 
 ## Changes made
-- <change>: <file>, <effect measured>
+- <change>: <file>, <effect measured>, <owner informed>
+
+## Not measured here
+- <target>: <why>, <steps to measure it on a real device>
 
 ## Remaining issues
 - <issue>, <suggested fix>, <owner>
 ```
+
+## Common mistakes
+
+| Mistake | Do this instead |
+|---|---|
+| Optimising before measuring | Measure, find the bottleneck, then pick the fix |
+| Reporting headless frame rates | Label frame rate Not verified without a real GPU |
+| Several changes at once | One change, one measurement, so you know what helped and what broke |
+| Compressing assets without looking at them | Compare before and after under the final lighting |
+| Lowering `dpr` below 1 or removing antialiasing silently | Record any visible quality trade-off as an open question |
+| Leaving `r3f-perf` or `leva` in the production bundle | Load them only in development, and check the bundle |
+| Optimising past the budget | Stop when the targets are met |

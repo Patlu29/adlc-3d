@@ -18,6 +18,24 @@ Write `docs/design-spec.md` with these sections:
 6. **3D interactions**: see the 3d-interaction-patterns skill
 7. **Loading and error states**
 8. **Accessibility**
+9. **Contract needs**: the store fields, test-hook queries and URL parameters the design depends on, for the architect
+10. **Decisions**: a dated list of design decisions
+
+### One statement per behaviour
+
+The spec is read literally by developers and by QA. If two sections disagree, one agent builds one and QA tests the other.
+
+- State each behaviour in one place and refer to it from elsewhere by section number
+- When a decision changes an earlier section, edit that section in the same change. The Decisions list records why; it never overrides the body of the spec
+- Before handoff, search the spec for every value and behaviour you changed and confirm nothing still states the old one
+
+### Specify with values
+
+| Vague | Specific |
+|---|---|
+| The panel slides in smoothly | The panel translates 16 px and fades in over `--duration-normal` with `--ease-standard`; instant with reduced motion |
+| Leave room for the scene on mobile | The expanded sheet is at most 55dvh and always leaves at least 168 px of canvas visible |
+| Labels should not clash | When two labels overlap, hide the one for the smaller object; the selected object's label always shows |
 
 ## Tokens
 
@@ -96,9 +114,19 @@ Developers must use tokens, never raw values. When you add a token, add it to th
 
 Touch targets must be at least 44 by 44 px.
 
+### Check the arithmetic
+
+For the smallest supported viewport (usually 360 by 640, and the same in landscape), add up every fixed height and width in each layout: title, controls, sheet, gaps and safe-area insets. Write the sum in the spec and confirm the canvas area that remains is the size you promised. A layout that only fits on your imagined screen is the most common design defect found in QA.
+
+- Say what happens when content does not fit: wrap, scroll, truncate or collapse
+- Elements that appear and disappear must not resize the canvas area or shift the scene, unless the spec says so
+- Use `dvh` units for full-height mobile layouts and allow for safe-area insets
+
 ## Accessibility
 
 - Text contrast of at least 4.5:1, and 3:1 for large text and UI controls
+- Calculate the ratio for every text and surface pair and record it in the spec. For translucent surfaces, calculate it twice: over the darkest and over the brightest colour the scene can show behind the panel. If the brightest case fails, make the surface more opaque
+- Give every control an accessible name that matches its visible label; put hints in a separate description
 - A visible focus outline on every interactive element, using `--color-focus`
 - All UI reachable and usable with the keyboard, in a logical tab order
 - Respect `prefers-reduced-motion` for UI and camera animation

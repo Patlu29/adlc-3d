@@ -10,12 +10,12 @@ user-invocable: false
 
 ## Make the scene deterministic
 
-Ask the frontend and scene developers for a test mode, enabled by a URL parameter such as `?test=1` in development and test builds only, that:
+The app has a test mode, enabled by `?test=1` in development and test builds only and defined in the project's contracts. If any of these is missing, request it from the scene developer and do not write screenshot tests that depend on it yet:
 
 - Stops all animation and auto-rotation
 - Puts the camera at a fixed, named position
 - Uses a fixed random seed for anything procedural
-- Exposes a ready flag once all assets have loaded and the first frame has rendered
+- Sets `window.__APP_TEST__.ready` once all assets have loaded and the first frame has rendered, and clears it during transitions
 
 ## Writing a screenshot test
 
@@ -46,6 +46,9 @@ test("US-4: default product view", async ({ page }) => {
 - Generate and compare baselines in the same environment, ideally the official Playwright Docker image in CI, because fonts, GPU and operating system change the output
 - Update baselines with `npx playwright test --update-snapshots` only when a visual change is intended, and say which change in the QA report
 - Never update a baseline just to make a failing test pass
+- Baselines generated on a developer machine will not match the pipeline. If you can only generate them locally, say so in the QA report and ask the devops-engineer to regenerate them once in the pipeline image
+- A baseline only proves the scene has not changed. Look at each new baseline image before committing it, and confirm it shows what the design spec describes; a baseline of a broken scene locks the bug in
+- Take a screenshot twice in a row before trusting it. If the two differ, the scene is not deterministic yet
 
 ## Reviewing a failure
 

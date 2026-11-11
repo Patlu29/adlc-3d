@@ -29,6 +29,17 @@ As a shopper, I want to rotate the product by dragging, so that I can see it fro
 - Include at least one criterion for touch, keyboard or reduced motion when the story involves interaction
 - Include the loading and error states: what the user sees while assets load, and when they fail
 - Follow INVEST: independent, negotiable, valuable, estimable, small and testable
+- Number the criteria in order (AC-1, AC-2) so tests and bug reports can refer to `US-1 AC-2`. Keep story and criterion IDs stable; never renumber
+- Put a number in any criterion about time, size, distance or count, with a tolerance a test can use: "within 1 to 2 seconds", "at least 44 px"
+- Words such as "exactly", "always" and "never" become literal test assertions. Use them only when you mean them, and give a tolerance otherwise
+- Each criterion describes one observable outcome. If it needs "and", split it
+- Criteria must not contradict each other or another story. Check stories that touch the same control or the same camera behaviour together
+
+| Weak criterion | Strong criterion |
+|---|---|
+| Then the camera moves smoothly to the planet | Then the camera reaches the planet in 1 to 2 seconds, and with reduced motion it arrives within 200 ms without animating |
+| Then the model is easy to tap | Then the tap target is at least 44 by 44 px at every zoom level |
+| Then the view resets | Then the camera returns to the first view, within 2 px of the original framing |
 
 ## Epics for a typical 3D web app
 

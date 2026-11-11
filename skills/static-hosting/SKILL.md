@@ -71,6 +71,25 @@ Other hosts have an equivalent, such as `headers` in `vercel.json` or response h
 
 If models load from another domain, that domain must send `Access-Control-Allow-Origin` for the app's origin, or the browser will block them.
 
+## Content security policy
+
+If the host sets a content security policy, 3D loaders need a few allowances or they fail without an obvious error:
+
+- Draco and KTX2 decoders run WebAssembly in workers created from blob URLs, so the policy needs `worker-src 'self' blob:` and `script-src 'self' 'wasm-unsafe-eval'`
+- Textures and models loaded through blob or data URLs need `img-src 'self' blob: data:` and `connect-src 'self'` plus any asset domain
+- Test the deployed preview with the policy on, and look for policy violations in the console
+
+## Sub-path deployments
+
+If the app is served from a sub-path, such as GitHub Pages project sites, set Vite's `base` option and make sure asset URLs in code are built from `import.meta.env.BASE_URL`. Absolute paths such as `/models/chair.glb` return 404 under a sub-path.
+
+## Check before handoff
+
+- [ ] Every file type in `dist/` and `public/` has a correct MIME type and cache rule in the hosting config
+- [ ] A request for a missing model returns 404, not `index.html`
+- [ ] `npm run preview` serves the build with no failed requests
+- [ ] The search `grep -r "__APP_TEST__" dist` finds nothing, so the test hook is not deployed
+
 ## Environment variables
 
 - Vite inlines `VITE_` variables at build time, so they are public; never put secrets in them

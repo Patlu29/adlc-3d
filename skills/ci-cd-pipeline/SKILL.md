@@ -12,6 +12,7 @@ user-invocable: false
 |---|---|---|
 | Install | `npm ci` | Every push and pull request |
 | Lint | `npm run lint` | Every push and pull request |
+| Format check | `npm run format:check` | Every push and pull request |
 | Type check | `npm run typecheck` | Every push and pull request |
 | Unit tests | `npm run test` | Every push and pull request |
 | Build | `npm run build` | Every push and pull request |
@@ -31,6 +32,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -38,6 +42,7 @@ concurrency:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -46,6 +51,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - run: npm run format:check
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build
@@ -57,6 +63,7 @@ jobs:
   e2e:
     needs: checks
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container:
       image: mcr.microsoft.com/playwright:<version matching @playwright/test>
     steps:
@@ -77,6 +84,19 @@ jobs:
 - Check the current major versions of each action before using them, and pin them
 - Pin the Playwright Docker image to the same version as `@playwright/test` in `package.json`; visual baselines depend on it
 - Keep the Node version in `.nvmrc` so local and CI builds match
+- Use only scripts that exist in `package.json`, and run each one locally before putting it in the workflow. `test:e2e` builds and serves the test-mode build itself through the Playwright config
+- Give the workflow the least permissions it needs; add write permissions only to the job that deploys
+- If the project installs from a private registry, the pipeline needs the same registry and a token from secrets. Record that as a manual step; do not copy credentials from the user's machine
+
+## Before handoff
+
+You usually cannot run the workflow, so check what you can:
+
+- [ ] The YAML parses, and every `run` command works locally
+- [ ] Action versions and the Playwright image tag were looked up, and the tag matches `@playwright/test` in `package-lock.json`
+- [ ] Screenshot baselines exist for the pipeline image, or `docs/deployment.md` tells the user how to generate them on the first run
+- [ ] No secret value is in any file
+- [ ] The handoff note labels the pipeline Not verified until it has run, and says what to look at on the first run
 
 ## Deployment
 
