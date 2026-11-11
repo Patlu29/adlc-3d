@@ -2,6 +2,6 @@
   "name": "prakash-plugins",
   "owner": { "name": "Prakash Rajan" },
   "plugins": [
-    { "name": "application-builder", "source": "./", "version": "2.1.0" }
+    { "name": "adlc-3d", "source": "./", "version": "3.0.0" }
   ]
 }

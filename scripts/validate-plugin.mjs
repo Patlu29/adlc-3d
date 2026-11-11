@@ -143,9 +143,58 @@ for (const { path, body } of documents) {
 
 // Every skill should be reachable: preloaded by an agent or invocable by the user
 const preloadedAnywhere = new Set(agents.flatMap(({ data }) => data.skills ?? []));
+// A skill named as "<plugin>:<skill>" in a command skill is loaded on demand by that command.
+const loadedByCommand = new Set();
+if (plugin) {
+  for (const [, { data, body }] of skills) {
+    if (data["user-invocable"] === "false") continue;
+    for (const [, name] of body.matchAll(new RegExp(`${plugin.name}:([a-z0-9-]+)`, "g")))
+      loadedByCommand.add(name);
+  }
+}
 for (const [name, { path, data }] of skills) {
-  if (!preloadedAnywhere.has(name) && data["user-invocable"] === "false")
-    fail(path, "is not preloaded by any agent and is not user-invocable, so nothing can reach it");
+  if (data["user-invocable"] !== "false") continue;
+  if (data["disable-model-invocation"] === "true")
+    fail(path, "is hidden from the user and from the model, so nothing can load it");
+  if (!preloadedAnywhere.has(name) && !loadedByCommand.has(name))
+    fail(path, "is not preloaded by any agent, loaded by any command skill or user-invocable, so nothing can reach it");
+}
+
+// The lifecycle: every command that runs it must load the rulebook, and every
+// agent named in the rulebook must exist.
+const LIFECYCLE = "lifecycle";
+const lifecycle = skills.get(LIFECYCLE);
+if (!lifecycle) {
+  fail(`skills/${LIFECYCLE}/SKILL.md`, "missing; the lifecycle commands depend on it");
+} else {
+  for (const command of ["build", "change"]) {
+    const skill = skills.get(command);
+    if (!skill) fail(`skills/${command}/SKILL.md`, "missing");
+    else if (!skill.body.includes(`${plugin?.name}:${LIFECYCLE}`))
+      fail(skill.path, `must tell the Tech Lead to load "${plugin?.name}:${LIFECYCLE}"`);
+  }
+  for (const phase of ["Plan", "Design", "Build", "Verify", "Review", "Release", "Operate and learn"]) {
+    if (!new RegExp(`\\|\\s*\\d\\s*\\|\\s*${phase}\\s*\\|`).test(lifecycle.body))
+      fail(lifecycle.path, `phase table has no row for "${phase}"`);
+  }
+  for (const agent of agentNames) {
+    if (!lifecycle.body.includes(agent)) fail(lifecycle.path, `no phase names the agent "${agent}"`);
+  }
+}
+
+// Names this plugin used before. A leftover would point users at a command that no longer exists.
+const RETIRED_NAMES = ["application" + "-builder", "3d-web-" + "application" + "-builder", "build" + "-3d-app"];
+// README.md is exempt: its upgrade note has to name the old plugin.
+const textFiles = [".claude-plugin/plugin.json", ".claude-plugin/marketplace.json"];
+for (const file of textFiles) {
+  if (!existsSync(join(root, file))) continue;
+  const text = readFileSync(join(root, file), "utf8");
+  for (const retired of RETIRED_NAMES)
+    if (text.includes(retired)) fail(file, `still uses the retired name "${retired}"`);
+}
+for (const { path, body } of documents) {
+  for (const retired of RETIRED_NAMES)
+    if (body.includes(retired)) fail(path, `still uses the retired name "${retired}"`);
 }
 
 if (errors.length > 0) {

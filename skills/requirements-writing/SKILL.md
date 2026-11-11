@@ -65,6 +65,24 @@ If the app shows facts (figures, names, dates, descriptions), add a requirement 
 - If there are more than about 10 Must requirements, challenge each one and move some to Should
 - Put anything needing a backend (accounts, saving, uploads) in its own epic so the architect can decide whether a backend is needed
 
+## Backlog
+
+`docs/requirements/backlog.md` holds everything that is known but not in the current iteration. It is where the next iteration starts.
+
+```markdown
+| ID | Type | Summary | Source | Priority | Status | Links |
+|---|---|---|---|---|---|---|
+| CR-1 | Feature | Share the current view as a link | User, 2026-11-11 | Should | Open | FR-12 |
+| CR-2 | Bug | Label overlaps the panel below 360 px | BUG-4, iteration 1 | Could | In progress (iteration 2) | US-3 AC-2 |
+| CR-3 | Verification | Frame rate on a mid-range phone was not measured | Iteration 1 release readiness | Must | Open | NFR-2 |
+```
+
+- Types are Feature, Bug, Performance, Verification, Debt and Operations
+- Status is Open, In progress (with the iteration number), Done (with the iteration number) or Declined (with the reason)
+- Record the source exactly: the user's words and the date, a bug ID, a review finding ID or a retrospective item
+- Keep IDs stable and never delete a row. A finished or declined item stays, with its status
+- When an item is taken into an iteration, its requirements and stories are written or updated in the requirements documents; the backlog row only links to them
+
 ## Open questions
 
 Write each open question so the user can answer in one line:
