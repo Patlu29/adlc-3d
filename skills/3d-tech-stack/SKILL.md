@@ -37,7 +37,24 @@ npm install three @react-three/fiber @react-three/drei zustand
 npm install -D @types/three vitest @playwright/test
 ```
 
-Check that the installed `@react-three/fiber` major version supports the installed React major version, and record the versions in `docs/architecture.md`.
+### Before installing
+
+- Confirm the registry is reachable with `npm ping`. If it fails or asks for credentials, stop and report it. Never edit the user's `.npmrc` or run `npm config set`
+- Scaffolding commands ask questions when the folder is not empty or a flag is missing, and an agent cannot answer them. Scaffold into a new empty subfolder and move the files, or write the config files by hand. Never leave a command waiting for input
+- Use Node's current LTS release and record it in `.nvmrc`
+
+### After installing
+
+React Three Fiber, drei and React must be compatible major versions; a mismatch produces peer dependency warnings at install and obscure runtime errors later.
+
+```bash
+npm ls react three @react-three/fiber @react-three/drei
+npm view @react-three/fiber peerDependencies
+```
+
+- Fix every peer dependency warning before going further; do not use `--force` or `--legacy-peer-deps` to hide one
+- Record the installed version of each runtime dependency in `docs/architecture.md`. Other agents read that table instead of guessing which API they have
+- Commit `package-lock.json` so every agent and the pipeline install the same versions
 
 ## When to deviate
 
@@ -77,3 +94,20 @@ Before adding any package, check:
 - Is it actively maintained, with a release in the last year?
 - What does it add to the production bundle?
 - Is there already a drei helper that does the same thing?
+- Does it load anything from a third-party domain at runtime? Fonts, decoders and environment presets fetched from a CDN break offline use, strict content security policies and privacy requirements
+
+Only the architect adds dependencies. Other agents request them in their handoff note.
+
+## Architecture document
+
+`docs/architecture.md` must contain:
+
+1. **Overview**: one paragraph and a simple diagram of scene, UI, store and any backend
+2. **Stack**: each choice with the requirement it serves
+3. **Installed versions**: a table of runtime dependencies
+4. **Structure**: the folder layout and module boundaries
+5. **Data flow**: how a user action travels from the UI or canvas through the store to the scene and back
+6. **Contracts**: the store contract, the test hook and test-mode URL parameters, and the asset manifest (see the team-conventions and state-management skills)
+7. **Loading strategy**: what loads in the entry bundle, what is lazy, and how the WebGL-unavailable fallback is reached
+8. **Requirement coverage**: a table mapping each Must requirement to the part of the architecture that delivers it
+9. **Risks**: what is most likely to go wrong and how the team will notice

@@ -16,8 +16,12 @@ my-3d-app/
 │   ├── requirements/
 │   ├── decisions/
 │   ├── handoffs/
+│   ├── project-status.md  # Tech Lead: phase, approvals, decisions
 │   ├── architecture.md
 │   ├── design-spec.md
+│   ├── performance.md
+│   ├── qa-report.md
+│   ├── deployment.md
 │   └── api.md             # only if there is a backend
 ├── public/
 │   ├── models/            # optimised .glb files
@@ -35,15 +39,19 @@ my-3d-app/
 │   ├── ui/
 │   │   ├── components/
 │   │   └── screens/
-│   ├── state/             # zustand stores
+│   ├── state/             # zustand stores and testHook.ts
+│   ├── data/              # static content shown in the UI, with its source noted
 │   ├── hooks/
 │   ├── styles/
 │   │   └── tokens.css
 │   ├── App.tsx
 │   └── main.tsx
 ├── tests/
-│   ├── e2e/
-│   └── unit/
+│   ├── e2e/               # qa-engineer
+│   └── unit/              # one folder per area, owned by that area's developer
+├── .env.example
+├── .gitignore
+├── .nvmrc
 ├── index.html
 ├── package.json
 ├── tsconfig.json
@@ -72,12 +80,22 @@ Every project must provide these scripts so the pipeline and other agents can re
 | Script | Purpose |
 |---|---|
 | `dev` | Start the dev server |
-| `build` | Type check and build for production |
+| `build` | Type check and build for production into `dist/` |
 | `preview` | Serve the production build locally |
+| `build:test` | Build in test mode into `dist-test/`, for example `vite build --mode test --outDir dist-test`. This build includes the test hook |
+| `preview:test` | Serve `dist-test/` on a fixed port, for example `vite preview --outDir dist-test --port 4173 --strictPort` |
 | `lint` | Run ESLint |
-| `typecheck` | Run `tsc --noEmit` |
-| `test` | Run unit tests once |
-| `test:e2e` | Run Playwright tests |
+| `format` | Format every file with Prettier |
+| `format:check` | Check formatting without changing files |
+| `typecheck` | Type check without emitting, using the command that suits the generated TypeScript config (`tsc --noEmit`, or `tsc -b` for project references) |
+| `test` | Run unit tests once and exit, never in watch mode. It must pass when there are no tests yet (Vitest: `vitest run --passWithNoTests`) |
+| `test:e2e` | Run Playwright tests against the test build |
+
+Run each script once after creating it. A script that exists but fails or waits for input blocks every other agent. The exception is `test:e2e`: define it at scaffold time, but its first run happens when the qa-engineer has written `playwright.config.ts` and the first spec.
+
+## .gitignore
+
+At minimum: `node_modules/`, `dist/`, `dist-test/`, `.env`, `.env.local`, `test-results/`, `playwright-report/` and `blob-report/`. Screenshot baselines in `tests/e2e/**/*-snapshots/` are committed, not ignored.
 
 ## Environment variables
 

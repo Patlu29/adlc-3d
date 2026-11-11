@@ -16,7 +16,12 @@ user-invocable: false
 - Exit: click empty space, press Escape, or close the panel
 - Touch: same as click; no hover state
 - Keyboard: Tab cycles through parts; Enter selects; Escape clears
+- Interrupted: a drag during the camera move cancels the move and gives control to the user
+- Repeated: selecting the selected part again does nothing
+- State: sets `selectedPartId` in the scene store
 ```
+
+Cover the edges for every interaction: what happens if it is interrupted, repeated, triggered while loading, or triggered while another transition is running. Unspecified edges are where developers guess and QA finds bugs.
 
 ## Camera controls
 
@@ -32,7 +37,9 @@ user-invocable: false
 Defaults:
 - Always limit zoom distance so the object cannot be lost or clipped
 - Disable panning unless users need it
-- Provide a **Reset view** button
+- Provide a **Reset view** button, and define the reset view precisely (camera position, target and framing) so "returns to the first view" can be tested
+- Frame the subject within the visible canvas area, not the whole window, when panels cover part of the canvas
+- A drag is not a click: releasing after a drag must not select what is under the pointer
 
 ## Selection and hover
 
@@ -46,6 +53,8 @@ Defaults:
 - Use drei `Html` for a small number of labels anchored to 3D points
 - Hide labels that are behind the model with the `occlude` option
 - For more than about 20 labels, render them as sprites or text in the scene instead of DOM elements
+- Labels collide when objects are close together on screen. Specify the rule: which label wins, and whether the other hides or moves. Check it in the first view at the smallest viewport
+- Make small objects easy to hit: specify a minimum target of 44 by 44 px on screen, whatever the object's rendered size
 
 ## Transitions
 

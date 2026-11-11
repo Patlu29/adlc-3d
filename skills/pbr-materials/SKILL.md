@@ -45,7 +45,7 @@ user-invocable: false
 ## Environment lighting
 
 - Use an HDR environment map for reflections and ambient light; PBR looks flat without one
-- Start with drei `<Environment preset="studio" />`, then switch to a custom HDR in `public/env/`
+- drei `<Environment preset="studio" />` is useful for a first look, but presets download from a third-party CDN. Ship a custom HDR in `public/env/` and load it with `<Environment files="/env/studio.hdr" />`
 - Keep environment maps at 1K or 2K resolution; 4K is rarely worth the download
 - Use `background={false}` unless the design wants the environment visible behind the scene
 
@@ -60,3 +60,17 @@ user-invocable: false
 - [ ] Materials look correct under the chosen environment map
 - [ ] No material uses `MeshPhysicalMaterial` features it does not need
 - [ ] Texture sizes are within the budgets in the gltf-asset-pipeline skill
+- [ ] Materials are created once and shared, not created inside a component that renders many times
+- [ ] No environment map, texture or font is fetched from a third-party domain
+- [ ] Each material is exported by name and listed in the handoff note with the meshes it is meant for
+
+## Common mistakes
+
+| Mistake | Result | Do this instead |
+|---|---|---|
+| Brightening lights to fix a dark scene | Blown-out highlights | Add an environment map, then adjust exposure |
+| Setting sRGB on a normal or roughness map | Wrong shading | Leave data maps linear |
+| Metal with no environment map | Black surface | Metals need something to reflect |
+| A new material instance per mesh | Extra draw calls and memory | Share one material |
+| Transparent material for a cut-out | Sorting artefacts | Use `alphaTest` |
+| Judging colour on an untone-mapped preview | Colours differ in the app | Check inside the app's canvas |

@@ -69,9 +69,21 @@ Never include stack traces or internal details in production responses.
 - List every variable in `server/.env.example` without real values
 - Restrict CORS to the app's own origins
 
+## Common mistakes
+
+| Mistake | Do this instead |
+|---|---|
+| Code and `docs/api.md` drifting apart | Change the document in the same step as the code, and note it in the handoff |
+| Trusting an ID from the client | Check the record belongs to the signed-in user on every request |
+| Returning a database error or stack trace | Map every failure to the error format |
+| A list without a limit | Paginate, with a maximum page size |
+| Validating in the handler body | Validate with a schema at the boundary, and derive the types from the schema |
+| CORS set to `*` with credentials | List the app's origins |
+| Testing only the success path | One test per error code in the contract |
+
 ## Contract
 
-Document every endpoint in `docs/api.md` before or while implementing it:
+Document every endpoint in `docs/api.md` before implementing it; the frontend developer builds against this document in parallel:
 
 ```markdown
 ### POST /api/v1/scenes
