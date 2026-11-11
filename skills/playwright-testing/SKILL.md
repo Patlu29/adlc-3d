@@ -20,16 +20,21 @@ The architect installs `@playwright/test` at scaffold time. If `npm ls` shows it
 ```ts
 import { defineConfig, devices } from "@playwright/test";
 
+const deployedUrl = process.env.PLAYWRIGHT_BASE_URL;
+
 export default defineConfig({
   testDir: "tests/e2e",
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  use: { baseURL: "http://localhost:4173", trace: "on-first-retry" },
-  webServer: {
-    command: "npm run build:test && npm run preview:test",
-    port: 4173,
-    reuseExistingServer: !process.env.CI,
-  },
+  use: { baseURL: deployedUrl ?? "http://localhost:4173", trace: "on-first-retry" },
+  // Against a deployed address there is no local server to start.
+  webServer: deployedUrl
+    ? undefined
+    : {
+        command: "npm run build:test && npm run preview:test",
+        port: 4173,
+        reuseExistingServer: !process.env.CI,
+      },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     { name: "firefox", use: { ...devices["Desktop Firefox"] } },
@@ -43,6 +48,7 @@ export default defineConfig({
 - Test the test-mode production build (`build:test`), not the dev server and not the real production build. The real production build has no test hook, so tests against it cannot see scene state
 - Check the device names against the installed Playwright version; the list changes between releases
 - If a browser was already installed, do not download it again. If a download is blocked, report it as an environment problem
+- **Deployed check.** Keep one spec, `tests/e2e/deployed.spec.ts`, that does not use the test hook or test mode: it loads the page, waits for something a user can see (the loading screen has gone and the main controls are visible), and fails on console errors and failed requests. Skip it unless `PLAYWRIGHT_BASE_URL` is set (`test.skip(!process.env.PLAYWRIGHT_BASE_URL)`), and run it with `PLAYWRIGHT_BASE_URL=<address> npx playwright test deployed`. Every other spec depends on the hook and must not be run against production
 - Write and run one spec first. Once it passes, add the rest; a broken setup is cheaper to find with one test than with a hundred
 
 ## One test per acceptance criterion

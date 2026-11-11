@@ -1,7 +1,7 @@
 {
-  "name": "application-builder",
-  "description": "A team of ten specialist agents and a Tech Lead workflow that take a 3D web application from idea to tested, deployable build with React Three Fiber.",
-  "version": "2.1.0",
+  "name": "adlc-3d",
+  "description": "A team of ten specialist agents and a Tech Lead that run an Agentic Development Life Cycle (Plan, Design, Build, Verify, Review, Release, Operate and learn) to take a 3D web application from idea to tested, deployable build with React Three Fiber, then through change iterations.",
+  "version": "3.0.0",
   "author": {
     "name": "Prakash Rajan"
   }

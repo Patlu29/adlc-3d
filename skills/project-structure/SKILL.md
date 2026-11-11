@@ -16,11 +16,13 @@ my-3d-app/
 │   ├── requirements/
 │   ├── decisions/
 │   ├── handoffs/
-│   ├── project-status.md  # Tech Lead: phase, approvals, decisions
+│   ├── lifecycle/         # Tech Lead: traceability, release readiness, retrospective
+│   ├── project-status.md  # Tech Lead: iteration, phase, approvals, decisions
 │   ├── architecture.md
 │   ├── design-spec.md
 │   ├── performance.md
 │   ├── qa-report.md
+│   ├── review.md          # architect: release review findings
 │   ├── deployment.md
 │   └── api.md             # only if there is a backend
 ├── public/

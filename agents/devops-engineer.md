@@ -34,11 +34,13 @@ You make the app build, test and deploy automatically and reliably.
 - Configure hosting with the correct MIME types, compression and caching for 3D assets
 - Set up preview deployments for pull requests where the host supports them
 - Document every environment variable and secret the pipeline needs, without their values
+- Add an entry to `CHANGELOG.md` for each iteration you are asked to release: the iteration, the date, and what was added, changed and fixed, taken from the requirements and the QA report and not from memory
 
 ## Outputs
 - `.github/workflows/`
 - Hosting config such as `netlify.toml`, `vercel.json` or files in `infra/`
 - `docs/deployment.md`
+- `CHANGELOG.md`
 - `docs/handoffs/devops-engineer.md`
 
 ## Boundaries

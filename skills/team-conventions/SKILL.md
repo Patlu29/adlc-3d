@@ -1,6 +1,6 @@
 ---
 name: team-conventions
-description: Shared rules for every agent on the 3D web application team, covering folder ownership, project documents and which one wins in a conflict, the contracts between agents, handoff notes, open questions, the definition of done and the report format. Preloaded into every agent in this plugin.
+description: Shared rules for every agent on the 3D web application team, covering the lifecycle phases, folder ownership, project documents and which one wins in a conflict, the contracts between agents, handoff notes, open questions, the definition of done and the report format. Preloaded into every agent in this plugin.
 user-invocable: false
 ---
 
@@ -8,12 +8,33 @@ user-invocable: false
 
 You are one member of a team of specialist agents building a 3D web application. These rules keep the team from overwriting each other's work and make sure context passes cleanly between agents. The working-principles skill covers how to think and verify; this skill covers how the team fits together.
 
+## The lifecycle
+
+The team works in the Agentic Development Life Cycle. Work moves through seven phases, and each pass through them is one iteration. Your task prompt names the iteration and the phase you are working in.
+
+| # | Phase | Agents | Ends with |
+|---|---|---|---|
+| 1 | Plan | product-manager | The user approves the scope |
+| 2 | Design | architect, ux-ui-designer | The user approves the design |
+| 3 | Build | technical-artist, scene-developer, frontend-developer, backend-developer, qa-engineer for the smoke test | Checks and the smoke test pass |
+| 4 | Verify | performance-optimiser, qa-engineer | Every criterion in scope has a result |
+| 5 | Review | architect, the Tech Lead | The user approves the release |
+| 6 | Release | devops-engineer | The pipeline and hosting config are ready |
+| 7 | Operate and learn | the Tech Lead, product-manager, qa-engineer if deployed | The retrospective and backlog are updated |
+
+What this means for you:
+
+- Your task serves the exit criteria of its phase. The **Done means** line in your task prompt lists them; meet them with evidence
+- Work only within the scope of the current iteration. Anything else you notice goes under **Open questions** or **Requests for other agents**, so it can reach the backlog
+- If you find that an artefact from an earlier phase is wrong, do not work around it. Report it so the owner can correct it in that phase
+- You may be called again in a later iteration. Your handoff note is how you will know what you did and why
+
 ## Folder ownership
 
 | Path | Owner |
 |---|---|
-| `docs/requirements/` | product-manager |
-| `docs/architecture.md`, `docs/decisions/`, root config files (`package.json`, `index.html`, `.gitignore`, `.env.example`, `.nvmrc`, Vite, TypeScript, ESLint and Prettier config) | architect |
+| `docs/requirements/`, including `backlog.md` | product-manager |
+| `docs/architecture.md`, `docs/decisions/`, root config files (`package.json`, `index.html`, `.gitignore`, `.env.example`, `.nvmrc`, Vite, TypeScript, ESLint and Prettier config), `docs/review.md` | architect |
 | `docs/design-spec.md`, `src/styles/` | ux-ui-designer |
 | `src/scene/` (except shaders and materials) | scene-developer |
 | `src/scene/shaders/`, `src/scene/materials/`, `public/models/`, `public/textures/`, `public/env/`, `public/draco/`, `public/basis/` | technical-artist |
@@ -22,8 +43,8 @@ You are one member of a team of specialist agents building a 3D web application.
 | `docs/performance.md` | performance-optimiser |
 | `tests/e2e/`, `playwright.config.ts`, `docs/qa-report.md` | qa-engineer |
 | `tests/unit/<area>/` | The developer who owns the code under test |
-| `.github/`, `infra/`, hosting config, `docs/deployment.md` | devops-engineer |
-| `docs/project-status.md` | The Tech Lead. Read only for every agent |
+| `.github/`, `infra/`, hosting config, `docs/deployment.md`, `CHANGELOG.md` | devops-engineer |
+| `docs/project-status.md`, `docs/lifecycle/` | The Tech Lead. Read only for every agent |
 | `assets/source/` | The user. Read only for every agent |
 
 Only edit paths you own. If a path you don't own needs a change, describe the change under **Requests for other agents** in your handoff note and name the owner. The performance-optimiser has a documented exception for optimisation changes.
@@ -36,12 +57,15 @@ Read the documents your task depends on before you start. Do not rely on memory 
 
 | Document | Contains |
 |---|---|
-| `docs/project-status.md` | Current phase, the user's approvals and decisions, environment notes |
+| `docs/project-status.md` | Current iteration and phase, the user's approvals and decisions, environment notes |
 | `docs/requirements/requirements.md` | Goals, scope, functional and non-functional requirements |
 | `docs/requirements/user-stories.md` | Stories and acceptance criteria |
+| `docs/requirements/backlog.md` | Change requests, deferred items and known gaps for later iterations |
 | `docs/architecture.md` | Stack, structure, data flow and the contracts between agents |
 | `docs/design-spec.md` | Layout, tokens, interactions, accessibility |
 | `docs/api.md` | Backend API contract |
+| `docs/review.md` | The architect's release review findings |
+| `docs/lifecycle/` | Traceability matrix, release readiness report and retrospective |
 | `docs/handoffs/<agent-name>.md` | Each agent's latest handoff note |
 
 ### When documents disagree
@@ -92,6 +116,8 @@ When you finish, write `docs/handoffs/<your-agent-name>.md`. If the file exists,
 
 ```markdown
 # Handoff: <agent-name>
+
+Iteration: <number and scope>. Phase: <number and name>.
 
 ## Summary
 <two or three sentences on what you did>
