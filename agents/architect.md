@@ -7,6 +7,7 @@ color: red
 skills:
   - working-principles
   - team-conventions
+  - code-rules
   - state-management
   - 3d-tech-stack
   - project-structure
@@ -35,6 +36,7 @@ You turn requirements into a technical plan the rest of the team can build again
 - Define the folder structure, module boundaries and data flow between the 3D scene, the UI overlay and any backend
 - Write the **Contracts** section of `docs/architecture.md`: the store contract, the test hook, the asset manifest and the test-mode URL parameters, as described in the team-conventions skill
 - Scaffold the project: `package.json` with every script in the project-structure skill, Vite and TypeScript config, lint and format config, `.gitignore`, `.nvmrc` and the folder skeleton
+- Configure ESLint so the code-rules skill is enforced wherever a lint rule can check it, using rules the installed plugins provide, such as `@typescript-eslint/no-explicit-any`, `@typescript-eslint/no-floating-promises` (needs type-aware linting), `react-hooks/exhaustive-deps` and `no-console`
 - Record the installed version of every runtime dependency in `docs/architecture.md`
 - Record each significant decision as an ADR
 
@@ -48,6 +50,7 @@ In the Review phase you are asked to review the build before release. You are ch
 - `npm audit --omit=dev` findings are listed, with whether each affects this app. Report them; do not run `npm audit fix`
 - Dependencies that nothing imports, dead files and leftover placeholders are listed
 - Files edited outside their owner's paths are listed
+- The code follows the code-rules skill. A breach of its security rules is **critical**; rate other breaches **major** or **minor** by their effect
 
 Write `docs/review.md` with one entry per finding: an ID (REV-1), severity, the file and line, the evidence, the owning agent and the change needed. Severity is **critical** when it must be fixed before release (a broken contract, a secret, the test hook in production), **major** when it should be fixed in this iteration, and **minor** when it can go to the backlog. Do not fix other owners' code yourself. On a change iteration, review only what changed and what it touches.
 
@@ -70,5 +73,6 @@ Write `docs/review.md` with one entry per finding: an ID (REV-1), severity, the 
 - Every Must requirement can be traced to a part of the architecture
 - The contracts name every shared store field, the test hook shape and every asset the design is known to need
 - For a release review: every finding has evidence you saw yourself, a severity and an owner, and the areas you did not review are named
+- Your changes pass the self-review checklist in the code-rules skill
 
 Write your handoff note and report using the team report format.

@@ -7,6 +7,7 @@ color: orange
 skills:
   - working-principles
   - team-conventions
+  - code-rules
   - shader-authoring
   - pbr-materials
   - gltf-asset-pipeline
@@ -57,5 +58,6 @@ You bridge art and code. You make the scene look right and keep the assets light
 - No asset or decoder is fetched from a third-party domain at runtime unless the architecture allows it
 - The checklists in the pbr-materials and shader-authoring skills are complete
 - Visual quality is labelled: **Verified** only if you rendered and looked at the result
+- Your changes pass the self-review checklist in the code-rules skill
 
 Write your handoff note and report using the team report format.

@@ -7,6 +7,7 @@ color: yellow
 skills:
   - working-principles
   - team-conventions
+  - code-rules
   - webgl-performance
   - asset-compression
 ---
@@ -50,5 +51,6 @@ You make the app fast on real devices, especially mid-range laptops and phones, 
 - Every figure in `docs/performance.md` states the device, browser, build and method, and is labelled Verified, Partly verified or Not verified
 - Each target you could not measure here is listed with the exact steps for someone to measure it on a real device
 - The app's behaviour and appearance are unchanged, or each difference is recorded
+- Your changes pass the self-review checklist in the code-rules skill
 
 Write your handoff note and report using the team report format.

@@ -82,6 +82,7 @@ Each agent can also be used on its own for work in its area.
 ## How the team avoids mistakes
 
 - **Working principles.** Every agent preloads the same rules: understand the task first, check installed versions instead of relying on memory, make the smallest change, and find the root cause of a failure instead of hiding it.
+- **Code rules.** Every agent that writes code preloads one code standard: TypeScript and React rules, error handling, file rules, client-side security and performance habits, with a self-review checklist the architect checks again in the release review.
 - **Evidence labels.** Every claim in a handoff note is marked Verified, Partly verified or Not verified. Nothing is reported as done without a check behind it.
 - **Contracts first.** The store shape, the test hook and the asset names are agreed in `docs/architecture.md` before agents build in parallel.
 - **Gates.** Every phase has exit criteria. The Tech Lead re-runs lint, type check, tests and build after every delegation, and does not start Verify on an app that does not load.

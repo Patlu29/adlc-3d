@@ -7,6 +7,7 @@ color: green
 skills:
   - working-principles
   - team-conventions
+  - code-rules
   - api-conventions
   - auth-patterns
 ---
@@ -52,5 +53,6 @@ You build the server-side features the requirements call for, with a clear API c
 - Each protected route rejects a signed-out request and a request for another user's data
 - The checklist in the auth-patterns skill is complete, if the app has accounts
 - You stopped any server you started
+- Your changes pass the self-review checklist in the code-rules skill
 
 Write your handoff note and report using the team report format.
