@@ -7,6 +7,7 @@ color: pink
 skills:
   - working-principles
   - team-conventions
+  - code-rules
   - design-system
   - 3d-interaction-patterns
 ---
@@ -54,5 +55,6 @@ You define how the app looks, how it feels and how people interact with both the
 - The layout sums are checked at the smallest and largest supported viewports
 - The spec does not contradict the requirements or itself; search it for each value you changed
 - Every token in `tokens.css` appears in the spec's token table, and the reverse
+- Your changes in `src/styles/` pass the self-review checklist in the code-rules skill, where its items apply to CSS
 
 You cannot render the design, so label visual judgements **Not verified** and list what QA should check on screen. Write your handoff note and report using the team report format.
