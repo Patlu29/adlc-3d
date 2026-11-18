@@ -104,6 +104,8 @@ Run this search, then check every hit that is in a file you changed:
 grep -rnE "console\.log|: any\b|as any|@ts-ignore|eslint-disable|dangerouslySetInnerHTML|innerHTML|eval\(|new Function|\.only\(|\.skip\(" src server tests 2>/dev/null
 ```
 
+If you have no command-line tool, run the same pattern with the Grep tool over the same folders.
+
 - [ ] No `any`, unjustified `!`, `@ts-ignore` or `eslint-disable` in your code
 - [ ] External data is validated before use, and nothing from data becomes HTML or code
 - [ ] No empty `catch`, floating promise, or effect without a cleanup
