@@ -48,7 +48,7 @@ export default defineConfig({
 - Test the test-mode production build (`build:test`), not the dev server and not the real production build. The real production build has no test hook, so tests against it cannot see scene state
 - Check the device names against the installed Playwright version; the list changes between releases
 - If a browser was already installed, do not download it again. If a download is blocked, report it as an environment problem
-- **Deployed check.** Keep one spec, `tests/e2e/deployed.spec.ts`, that does not use the test hook or test mode: it loads the page, waits for something a user can see (the loading screen has gone and the main controls are visible), and fails on console errors and failed requests. Skip it unless `PLAYWRIGHT_BASE_URL` is set (`test.skip(!process.env.PLAYWRIGHT_BASE_URL)`), and run it with `PLAYWRIGHT_BASE_URL=<address> npx playwright test deployed`. Every other spec depends on the hook and must not be run against production
+- **Deployed check.** Keep one spec, `tests/e2e/deployed.spec.ts`, that does not use the test hook or test mode: it loads the page, waits for something a user can see (the loading screen has gone and the main controls are visible), and fails on console errors and failed requests. Skip it unless `PLAYWRIGHT_BASE_URL` is set (`test.skip(!process.env.PLAYWRIGHT_BASE_URL, "needs a deployed address")`), and run it with `PLAYWRIGHT_BASE_URL=<address> npx playwright test deployed`. Every other spec depends on the hook and must not be run against production
 - Write and run one spec first. Once it passes, add the rest; a broken setup is cheaper to find with one test than with a hundred
 
 ## One test per acceptance criterion
@@ -67,11 +67,28 @@ The DOM cannot see 3D objects, so do not try to find them with selectors. Use th
 
 1. **Test hook state.** The app exposes `window.__APP_TEST__` in development and test builds, with the shape `{ ready, stores, scene }` defined in the state-management skill and the project's contracts:
 
+Type the hook once, in a shared helper, so a typo in a field name fails the type check:
+
 ```ts
-await page.waitForFunction(() => (window as any).__APP_TEST__?.ready === true);
-const selected = await page.evaluate(() =>
-  (window as any).__APP_TEST__.stores.useSceneStore.getState().selectedPartId
-);
+// tests/e2e/helpers/test-hook.ts
+import type { AppTestHook } from "../../../src/state/testHook";
+
+declare global {
+  interface Window {
+    __APP_TEST__?: AppTestHook;
+  }
+}
+export {};
+```
+
+```ts
+await page.waitForFunction(() => window.__APP_TEST__?.ready === true);
+const selected = await page.evaluate(() => {
+  const store = window.__APP_TEST__?.stores.useSceneStore as
+    | { getState: () => { selectedPartId: string | null } }
+    | undefined;
+  return store?.getState().selectedPartId;
+});
 expect(selected).toBe("seat");
 ```
 
@@ -121,6 +138,25 @@ expect(problems.filter((p) => !KNOWN_NOISE.some((re) => re.test(p)))).toEqual([]
 - No failed network requests, and no requests to third-party domains unless the architecture allows them
 - The WebGL-unavailable fallback appears when WebGL is disabled
 - The production build (`dist/`) does not contain `__APP_TEST__`
+
+## Accessibility checks
+
+Scan each main UI state (loaded, a panel open, an error state, the WebGL fallback) with `@axe-core/playwright` against WCAG 2.2 AA:
+
+```ts
+import AxeBuilder from "@axe-core/playwright";
+
+const results = await new AxeBuilder({ page })
+  .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+  .analyze();
+expect(results.violations).toEqual([]);
+```
+
+- axe sees only the DOM. It cannot check anything drawn inside the canvas, so it proves the overlay, not the scene
+- Report a violation with impact `critical` or `serious` as a **major** bug, and `moderate` or `minor` as **minor**
+- Results in `incomplete` (often contrast over the canvas, which axe cannot measure) are manual checks. List them in the QA report as **Not verified** with what a person must look at
+- Keep the keyboard tests from the acceptance criteria. Also test by hand, or with keyboard-only specs, that every scene action has a non-drag alternative (WCAG 2.5.7) and that focus is never hidden behind a panel (2.4.11)
+- If `@axe-core/playwright` is not installed, as in projects scaffolded before it was added to the stack, request it from the architect and mark the accessibility criteria **Partly verified**. Do not block the rest of the suite
 
 ## WebGL in headless browsers
 

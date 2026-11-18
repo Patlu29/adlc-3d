@@ -90,7 +90,21 @@ Each agent can also be used on its own for work in its area.
 - **Independent review.** The architect reviews the finished code against the contracts before you are asked to approve a release.
 - **A closed loop.** Open bugs, unverified items and lessons from each iteration go into the backlog instead of being forgotten.
 - **One owner per path.** Agents edit only their own folders and route everything else through handoff requests.
+- **Guardrail hooks.** Inside a project with `docs/project-status.md`, a hook blocks writes to `.env` files with values, generated output, `package-lock.json`, your `assets/source/` folder and the Tech Lead's lifecycle files, and blocks new content that looks like a credential. A second hook warns an agent that edits another agent's folder and lists code-rules hits in the file it changed. See [Guardrail hooks](#guardrail-hooks).
+- **Security baseline.** The code rules map to the OWASP Top 10. The generated pipeline adds `npm audit` with expiring exceptions, a licence allow-list, a CycloneDX SBOM, a gitleaks secret scan, Dependabot and CodeQL, and hosting ships security headers with a content security policy that starts in report-only mode.
+- **Accessibility.** The default standard is WCAG 2.2 AA. The design spec covers the criteria 3D apps most often miss, such as alternatives to dragging, and QA scans each UI state with axe, listing the checks axe cannot do inside the canvas.
 - **Honest limits.** Frame rates from headless browsers, browsers that could not be launched and devices that were not tested are reported as unverified, not as passes.
+
+## Guardrail hooks
+
+From 3.2.0 the plugin ships two hooks that run on every Write and Edit while the plugin is enabled.
+
+- **They act only inside an ADLC project:** a folder whose root has `docs/project-status.md`. Your other projects are untouched. Before the Plan phase creates that file, nothing is guarded
+- **They never approve anything.** They can only block a write (before it) or add a warning (after it), so your own permission prompts still apply
+- **They fail open.** If Node is missing, the input is unexpected or a hook errors or takes more than 5 seconds, the write goes ahead
+- **They do not cover shell commands.** An agent could still write a file through Bash; the agents are told not to, and the pipeline's secret scan is the backstop
+
+To switch them off for one project, add a line `Hooks: off` to `docs/project-status.md`. To switch them off for a session, start Claude Code with `ADLC3D_HOOKS=off`.
 
 ## What the build produces
 
@@ -115,14 +129,21 @@ Alongside the application code, each project gets:
 agents/           one file per agent
 skills/           one folder per skill; build, change and status are the commands,
                   and lifecycle is the rulebook they load
-scripts/          validate-plugin.mjs
+hooks/            hooks.json, the guard and review hooks, and their shared ownership map
+scripts/          validate-plugin.mjs and test-hooks.mjs
 ```
 
-After any change, run the validator. It checks frontmatter, that every skill an agent preloads exists, that references to agents and skills resolve, that the lifecycle names every phase and agent, and that the two manifest versions match:
+After any change, run the validator and the hook tests. The validator checks frontmatter, that every skill an agent preloads exists, that references to agents and skills resolve, that the lifecycle names every phase and agent, that the hooks point at real scripts and agents, that the governance files exist, and that the manifest versions and changelog match:
 
 ```bash
 node scripts/validate-plugin.mjs
 ```
+
+```bash
+node scripts/test-hooks.mjs
+```
+
+See `CONTRIBUTING.md` for the branch, versioning and release process, and `SECURITY.md` to report a vulnerability. The plugin is proprietary; see `LICENSE`.
 
 Guidelines:
 

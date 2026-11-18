@@ -47,7 +47,9 @@ In the Review phase you are asked to review the build before release. You are ch
 - The architecture document still describes the code. Update it where the build legitimately moved on
 - The test hook and test mode are absent from the production build (`npm run build`, then search `dist/` for `__APP_TEST__`)
 - No secret values, credentials or personal data are in the repository
-- `npm audit --omit=dev` findings are listed, with whether each affects this app. Report them; do not run `npm audit fix`
+- `npm audit --omit=dev` findings are listed, with whether each affects this app. Report them; do not run `npm audit fix`. Exceptions in `.github/audit-exceptions.json` have a reason, an owner and an expiry date that has not passed
+- The supply-chain and hosting controls in the ci-cd-pipeline and static-hosting skills are in place: the security job, licence check, SBOM, Dependabot, code scanning or the user's recorded decision against it, and the security headers. A missing control is **major**; a missing header that the OWASP mapping in the code-rules skill relies on is **critical**
+- Each OWASP Top 10 row in the code-rules skill that applies to this app has evidence, or is listed as a finding
 - Dependencies that nothing imports, dead files and leftover placeholders are listed
 - Files edited outside their owner's paths are listed
 - The code follows the code-rules skill. A breach of its security rules is **critical**; rate other breaches **major** or **minor** by their effect

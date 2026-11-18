@@ -75,6 +75,23 @@ The security rules in section 5 are the exception: only a user decision recorded
 - Backend code follows the api-conventions and auth-patterns skills. In addition, never build a query, file path or shell command by joining strings with request data, and resolve upload paths inside a fixed directory so `../` cannot escape it
 - Workflows give each job only the `permissions:` it needs and read credentials only from the repository's secret store
 
+### OWASP Top 10 mapping
+
+The architect's release review and any security audit trace these rules to the OWASP Top 10 (2021). A breach of any row is **critical**.
+
+| OWASP category | Covered by |
+|---|---|
+| A01 Broken access control | auth-patterns role checks on every protected route; upload paths resolved inside a fixed directory |
+| A02 Cryptographic failures | No secrets in client code; HTTPS only (HSTS in the static-hosting skill); managed auth providers and hashed passwords (auth-patterns) |
+| A03 Injection | No data turned into HTML or code; no queries, paths or commands built from request data; `https:` checks on URLs |
+| A04 Insecure design | Threats considered in `docs/architecture.md` for each external input: uploads, URL parameters, API calls and embeds |
+| A05 Security misconfiguration | Security headers and content security policy (static-hosting); test hook absent from production; least-privilege workflow permissions |
+| A06 Vulnerable and outdated components | Only the architect adds dependencies; `npm audit`, licence check and Dependabot in the pipeline (ci-cd-pipeline) |
+| A07 Identification and authentication failures | auth-patterns: managed provider, secure session cookies, rate limiting |
+| A08 Software and data integrity failures | `npm ci` from the lockfile; pinned action versions; external data validated before use; no runtime third-party scripts |
+| A09 Security logging and monitoring failures | Backend logs security events without tokens or personal data (api-conventions) |
+| A10 Server-side request forgery | GLB only, or glTF with no external URLs; the backend never fetches a URL taken from request data without an allow-list |
+
 ## 6. Performance habits
 
 The budgets live in the webgl-performance skill. These habits keep code inside them from the first commit, so the performance-optimiser's round is tuning, not rework.
@@ -92,7 +109,7 @@ The budgets live in the webgl-performance skill. These habits keep code inside t
 
 - The owner of the code writes its unit tests in `tests/unit/<area>/`. Test behaviour through the public function or component, not private details
 - A bug fix in unit-testable code comes with a test that fails without the fix
-- Leave no `.only` or `.skip` in specs, and no fixed delays: wait for a condition, such as the test hook's `ready` flag
+- Leave no `.only` in specs, and no `.skip` except a conditional skip with a reason, such as `test.skip(!process.env.PLAYWRIGHT_BASE_URL, "needs a deployed address")` in the deployed spec. No fixed delays: wait for a condition, such as the test hook's `ready` flag
 - Tests are deterministic: no real network, and a fixed clock and seed wherever time or randomness matters
 - Type the test hook once in a shared test helper and use that type. Do not reach it through `as any`
 

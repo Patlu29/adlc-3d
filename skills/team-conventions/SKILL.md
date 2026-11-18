@@ -43,11 +43,27 @@ What this means for you:
 | `docs/performance.md` | performance-optimiser |
 | `tests/e2e/`, `playwright.config.ts`, `docs/qa-report.md` | qa-engineer |
 | `tests/unit/<area>/` | The developer who owns the code under test |
-| `.github/`, `infra/`, hosting config, `docs/deployment.md`, `CHANGELOG.md` | devops-engineer |
+| `.github/`, `infra/`, hosting config (such as `netlify.toml`, `vercel.json`, `public/_headers` and `public/_redirects`), `docs/deployment.md`, `CHANGELOG.md` | devops-engineer |
+| `docs/handoffs/<agent-name>.md` | That agent |
 | `docs/project-status.md`, `docs/lifecycle/` | The Tech Lead. Read only for every agent |
 | `assets/source/` | The user. Read only for every agent |
 
 Only edit paths you own. If a path you don't own needs a change, describe the change under **Requests for other agents** in your handoff note and name the owner. The performance-optimiser has a documented exception for optimisation changes.
+
+A path the table does not list, such as `src/lib/`, `src/types/` or `scripts/`, belongs to the architect until `docs/architecture.md` assigns it to someone. Ask the architect under **Requests for other agents** before creating one. The guardrail hooks do not warn about unlisted paths, so check this yourself.
+
+### Guardrail hooks
+
+The plugin's hooks act on every file write inside a project that has `docs/project-status.md`:
+
+| Hook | What it does |
+|---|---|
+| Before a write | Blocks `.env` files that hold values (`.env`, `.env.local`, `.env.production`, `.env.*.local`), generated output (`dist/`, `node_modules/`, test reports), `package-lock.json`, `assets/source/`, agents writing `docs/project-status.md` or `docs/lifecycle/`, and new content that looks like a credential |
+| After a write | Warns when you edited a path another agent owns, and lists code-rules self-review hits in the file you changed |
+
+A block is not an error to work around. Do not try another tool, such as a shell command, to make the same write; follow the reason the hook gives, or report it under **Open questions**. A warning after a write needs action: undo an edit outside your paths, and fix or justify each code-rules hit.
+
+The user can switch the hooks off for one project with a line `Hooks: off` in `docs/project-status.md`, or for a session with the environment variable `ADLC3D_HOOKS=off`. Only the user decides this; record it under **Decisions**.
 
 Only the architect adds, removes or upgrades dependencies. If you need a package, request it.
 

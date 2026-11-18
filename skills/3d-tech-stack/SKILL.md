@@ -34,7 +34,7 @@ Do not pin versions from memory. Install the current releases when scaffolding:
 ```bash
 npm create vite@latest . -- --template react-ts
 npm install three @react-three/fiber @react-three/drei zustand
-npm install -D @types/three vitest @playwright/test
+npm install -D @types/three vitest @playwright/test @axe-core/playwright
 ```
 
 ### Before installing
