@@ -71,12 +71,34 @@ Other hosts have an equivalent, such as `headers` in `vercel.json` or response h
 
 If models load from another domain, that domain must send `Access-Control-Allow-Origin` for the app's origin, or the browser will block them.
 
-## Content security policy
+## Security headers
 
-If the host sets a content security policy, 3D loaders need a few allowances or they fail without an obvious error:
+Every deployment sends this baseline on HTML responses. Adapt the syntax to the host; the Netlify form is shown:
 
-- Draco and KTX2 decoders run WebAssembly in workers created from blob URLs, so the policy needs `worker-src 'self' blob:` and `script-src 'self' 'wasm-unsafe-eval'`
-- Textures and models loaded through blob or data URLs need `img-src 'self' blob: data:` and `connect-src 'self'` plus any asset domain
+```text
+/*
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; img-src 'self' blob: data:; connect-src 'self' blob: data:; style-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
+```
+
+- `Strict-Transport-Security` without `preload`. Preloading is hard to undo, so it needs the user's decision
+- `frame-ancestors 'none'` stops other sites embedding the app. If the requirements say the app is embedded, list the allowed origins instead
+- `Permissions-Policy` must not block a feature the requirements use. Leave out `gyroscope`, `accelerometer` and `xr-spatial-tracking` from the deny list if the app uses device orientation or WebXR
+
+### Content security policy
+
+The policy starts as `Content-Security-Policy-Report-Only`, which reports violations without blocking anything. The QA engineer runs the suite against the preview and lists every violation in the QA report. Once a release has none, switch the header to `Content-Security-Policy`, which enforces it. Record the switch in `docs/deployment.md`.
+
+3D loaders need a few allowances or they fail without an obvious error:
+
+- Draco and KTX2 decoders run WebAssembly in workers created from blob URLs, so the policy needs `worker-src 'self' blob:` and `script-src 'self' 'wasm-unsafe-eval'`. drei `Text` (troika) also uses blob workers
+- Textures and models loaded through blob or data URLs need `img-src 'self' blob: data:` and `connect-src 'self' blob: data:` plus any asset domain. `GLTFLoader` reads textures embedded in a GLB with `fetch()` on a blob URL, so without `blob:` in `connect-src` they fail once the policy is enforced
+- Libraries that inject styles at runtime (such as Leva, or CSS-in-JS) need `style-src 'self' 'unsafe-inline'`. Prefer removing them from the production build to loosening the policy
+- Anything loaded from another domain, such as a drei `Environment` preset, needs that domain in `connect-src`, and the domain must also be listed in `docs/architecture.md`. Self-hosting is better
 - Test the deployed preview with the policy on, and look for policy violations in the console
 
 ## Sub-path deployments

@@ -124,6 +124,8 @@ For the smallest supported viewport (usually 360 by 640, and the same in landsca
 
 ## Accessibility
 
+The standard is **WCAG 2.2 level AA** for everything outside the canvas, unless the requirements set a different level. The scene itself cannot be read by assistive technology, so every piece of information or action it offers needs an equivalent in the 2D UI.
+
 - Text contrast of at least 4.5:1, and 3:1 for large text and UI controls
 - Calculate the ratio for every text and surface pair and record it in the spec. For translucent surfaces, calculate it twice: over the darkest and over the brightest colour the scene can show behind the panel. If the brightest case fails, make the surface more opaque
 - Give every control an accessible name that matches its visible label; put hints in a separate description
@@ -131,3 +133,17 @@ For the smallest supported viewport (usually 360 by 640, and the same in landsca
 - All UI reachable and usable with the keyboard, in a logical tab order
 - Respect `prefers-reduced-motion` for UI and camera animation
 - Provide a text description of the scene's content for screen readers
+
+The WCAG 2.2 criteria that 3D apps most often miss:
+
+| Criterion | What it means here |
+|---|---|
+| 2.5.7 Dragging movements | Orbit, pan and drag-to-place need a single-pointer alternative, such as rotate and zoom buttons or a list of views |
+| 2.5.8 Target size (minimum) | Every control, including hotspots and annotation markers projected over the scene, is at least 24 by 24 CSS pixels or has enough spacing |
+| 2.4.11 Focus not obscured | A focused control is never hidden behind a panel, the HUD or an open sheet |
+| 2.1.1 Keyboard | Every scene action (select, rotate, change view, open an annotation) works from the keyboard |
+| 2.2.2 Pause, stop, hide | Auto-rotation and looping animation that last more than five seconds can be paused |
+| 2.3.3 Animation from interactions | Camera fly-throughs respect `prefers-reduced-motion` (AAA, but expected by this team) |
+| 1.4.11 Non-text contrast | Hotspots and outlines reach 3:1 against the brightest and darkest scene areas behind them |
+
+In the spec, record for each of these how the design meets it, or why it does not apply.

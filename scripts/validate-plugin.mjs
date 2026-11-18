@@ -184,7 +184,7 @@ if (!lifecycle) {
 
 // Names this plugin used before. A leftover would point users at a command that no longer exists.
 const RETIRED_NAMES = ["application" + "-builder", "3d-web-" + "application" + "-builder", "build" + "-3d-app"];
-// README.md is exempt: its upgrade note has to name the old plugin.
+// README.md and CHANGELOG.md are exempt: their history has to name the old plugin.
 const textFiles = [".claude-plugin/plugin.json", ".claude-plugin/marketplace.json"];
 for (const file of textFiles) {
   if (!existsSync(join(root, file))) continue;
@@ -195,6 +195,46 @@ for (const file of textFiles) {
 for (const { path, body } of documents) {
   for (const retired of RETIRED_NAMES)
     if (body.includes(retired)) fail(path, `still uses the retired name "${retired}"`);
+}
+
+// Hooks: every command must point at a script that exists, and the ownership map in the hooks
+// may only name real agents.
+const hooksConfig = existsSync(join(root, "hooks/hooks.json")) ? readJson("hooks/hooks.json") : null;
+if (!hooksConfig) fail("hooks/hooks.json", "missing");
+else {
+  for (const [event, groups] of Object.entries(hooksConfig.hooks ?? {})) {
+    for (const group of groups) {
+      for (const hook of group.hooks ?? []) {
+        const script = /\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s]+)/.exec(hook.command ?? "");
+        if (!script) fail("hooks/hooks.json", `${event} command does not run a script from \${CLAUDE_PLUGIN_ROOT}`);
+        else if (!existsSync(join(root, script[1]))) fail("hooks/hooks.json", `${event} runs ${script[1]}, which does not exist`);
+        if (!hook.timeout || hook.timeout > 10) fail("hooks/hooks.json", `${event} hook needs a timeout of 10 seconds or less`);
+      }
+    }
+  }
+}
+if (existsSync(join(root, "hooks/lib.mjs"))) {
+  const { AGENTS, OWNERSHIP } = await import(new URL("../hooks/lib.mjs", import.meta.url));
+  for (const name of agentNames)
+    if (!AGENTS.includes(name)) fail("hooks/lib.mjs", `AGENTS is missing "${name}"`);
+  for (const name of AGENTS)
+    if (!agentNames.has(name)) fail("hooks/lib.mjs", `AGENTS names "${name}", which is not an agent`);
+  for (const [prefix, owners] of OWNERSHIP) {
+    for (const owner of owners)
+      if (!agentNames.has(owner)) fail("hooks/lib.mjs", `OWNERSHIP gives "${prefix}" to "${owner}", which is not an agent`);
+    const conventions = skills.get("team-conventions");
+    if (conventions && !conventions.body.includes(`\`${prefix}`))
+      fail("hooks/lib.mjs", `OWNERSHIP lists "${prefix}", which the team-conventions ownership table does not mention`);
+  }
+}
+
+// Governance files a corporate review expects.
+for (const file of ["LICENSE", "SECURITY.md", "CONTRIBUTING.md", "CHANGELOG.md", ".github/CODEOWNERS"])
+  if (!existsSync(join(root, file))) fail(file, "missing");
+if (plugin && existsSync(join(root, "CHANGELOG.md"))) {
+  const changelog = readFileSync(join(root, "CHANGELOG.md"), "utf8");
+  if (!changelog.includes(`## [${plugin.version}]`))
+    fail("CHANGELOG.md", `has no entry for version ${plugin.version}`);
 }
 
 if (errors.length > 0) {

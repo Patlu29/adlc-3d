@@ -1,8 +1,20 @@
 {
   "name": "adlc-3d",
   "description": "A team of ten specialist agents and a Tech Lead that run an Agentic Development Life Cycle (Plan, Design, Build, Verify, Review, Release, Operate and learn) to take a 3D web application from idea to tested, deployable build with React Three Fiber, then through change iterations.",
-  "version": "3.1.1",
+  "version": "3.2.0",
   "author": {
     "name": "Prakash Rajan"
-  }
+  },
+  "license": "UNLICENSED",
+  "homepage": "https://github.com/Patlu29/adlc-3d",
+  "repository": "https://github.com/Patlu29/adlc-3d",
+  "keywords": [
+    "adlc",
+    "agents",
+    "3d",
+    "react-three-fiber",
+    "threejs",
+    "webgl",
+    "lifecycle"
+  ]
 }

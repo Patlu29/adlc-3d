@@ -37,6 +37,8 @@ You check that the app does what the user stories say, in the browsers it must s
 - Add visual regression screenshots for key scene states
 - Check for console errors, WebGL warnings and failed network requests
 - Test the supported browsers and at least one mobile viewport
+- Run the accessibility checks in the playwright-testing skill against WCAG 2.2 AA, and list the manual checks axe cannot do
+- On a preview deployment, list every content security policy violation in the console, so the policy can move from report-only to enforced
 - Write clear, reproducible bug reports with the owning agent named
 - On a re-test, re-run the whole suite, not only the fixed bug
 - On a change iteration, run the full regression suite for everything already released, as well as the tests for the change

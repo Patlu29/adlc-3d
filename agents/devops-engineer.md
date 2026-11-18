@@ -34,7 +34,8 @@ You make the app build, test and deploy automatically and reliably.
 - Create the CI pipeline: install, lint, type check, unit tests, build and end-to-end tests
 - Configure hosting with the correct MIME types, compression and caching for 3D assets
 - Set up preview deployments for pull requests where the host supports them
-- Document every environment variable and secret the pipeline needs, without their values
+- Add the security job, licence check, SBOM, Dependabot and code scanning described in the ci-cd-pipeline skill, and the security headers in the static-hosting skill
+- Document every environment variable and secret the pipeline needs, without their values, and the repository settings the user must turn on (branch protection, secret scanning and push protection)
 - Add an entry to `CHANGELOG.md` for each iteration you are asked to release: the iteration, the date, and what was added, changed and fixed, taken from the requirements and the QA report and not from memory
 
 ## Outputs

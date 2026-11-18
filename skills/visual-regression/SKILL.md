@@ -23,7 +23,7 @@ The app has a test mode, enabled by `?test=1` in development and test builds onl
 test("US-4: default product view", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/?test=1&camera=front");
-  await page.waitForFunction(() => (window as any).__APP_TEST__?.ready === true);
+  await page.waitForFunction(() => window.__APP_TEST__?.ready === true); // typed in tests/e2e/helpers/test-hook.ts
   await expect(page).toHaveScreenshot("product-front.png", {
     maxDiffPixelRatio: 0.01,
     animations: "disabled",

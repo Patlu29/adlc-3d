@@ -146,6 +146,8 @@ A row with no test, or a result that is not Verified, is a gap. Every gap on a M
 - Scope of this iteration, and what changed since the last release
 - Results: criteria passed, failed, partly verified and not tested; bugs open by severity
 - Performance against each budget, with how it was measured
+- Accessibility against WCAG 2.2 AA (or the level in the requirements): automated violations by impact, and the manual checks done and not done
+- Security: the audit, licence and secret scan results, open OWASP findings, and whether the content security policy is report-only or enforced
 - Review findings still open, by severity
 - Traceability gaps on Must requirements
 - What is not verified, and what the user would need to do to verify it

@@ -17,6 +17,8 @@ user-invocable: false
 | Unit tests | `npm run test` | Every push and pull request |
 | Build | `npm run build` | Every push and pull request |
 | End-to-end tests | `npm run test:e2e` | Every pull request and `main` |
+| Security | `npm audit`, SBOM, licence check | Every pull request and `main` |
+| Code scanning | CodeQL | Pull requests, `main` and weekly |
 | Preview deploy | Host-specific | Pull requests |
 | Production deploy | Host-specific | `main`, after every check passes, with approval |
 
@@ -88,6 +90,47 @@ jobs:
 - Give the workflow the least permissions it needs; add write permissions only to the job that deploys
 - If the project installs from a private registry, the pipeline needs the same registry and a token from secrets. Record that as a manual step; do not copy credentials from the user's machine
 
+## Security and supply chain
+
+Add a `security` job to `ci.yml`, alongside `checks`:
+
+```yaml
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: node .github/scripts/check-audit.mjs
+      - run: npm sbom --sbom-format cyclonedx --omit dev > sbom.cdx.json
+      - run: node .github/scripts/check-licences.mjs sbom.cdx.json
+      - run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:vX.Y.Z detect --source /repo --redact
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cdx.json
+```
+
+Run the same job on a weekly `schedule` as well, so a new advisory in an unchanged project is still found.
+
+- `.github/scripts/check-audit.mjs` runs `npm audit --omit=dev --json` and fails on any high or critical advisory that is not in `.github/audit-exceptions.json`. Each exception names the advisory, the reason it does not affect the app, who accepted it and an expiry date no more than 90 days away; an expired exception fails the job. Do not run `npm audit fix`; report advisories to the architect, who owns dependencies
+- `npm sbom` needs npm 9.5 or later; check with `npm -v`. The SBOM is a release artefact the user can hand to a client or auditor
+- gitleaks scans the whole history for committed secrets. Use its Docker image rather than its GitHub Action, which needs a licence key (free, but registered) for organisation accounts. Look up the current image version and replace `vX.Y.Z` with it
+- Write both scripts with Node built-ins only, so they add no dependency
+- `.github/scripts/check-licences.mjs` reads the SBOM and fails on any runtime dependency whose licence is not in `.github/licence-allowlist.json`. Start the list with `MIT`, `ISC`, `BSD-2-Clause`, `BSD-3-Clause`, `Apache-2.0`, `0BSD` and `CC0-1.0`. A dependency with no licence, or a copyleft licence such as GPL or AGPL, needs the user's decision recorded in `docs/project-status.md` before it is allowed
+
+Add `.github/dependabot.yml` with weekly updates for `npm` and `github-actions`, grouping minor and patch updates into one pull request per ecosystem. Dependabot pull requests go through the same checks as any other change; the architect decides on major upgrades.
+
+Add `.github/workflows/codeql.yml` from GitHub's CodeQL template with `languages: javascript-typescript`, triggered on pull requests, `main` and a weekly schedule, with `security-events: write` on that job only. Code scanning is free on public repositories; a private repository needs GitHub Advanced Security. If the repository is private, record CodeQL as a manual decision for the user, and refer any pricing question to GitHub's sales team.
+
+Secret scanning and push protection are repository settings, not files, and on private repositories they also need GitHub Advanced Security. Branch protection on a private repository needs a paid GitHub plan. List these in `docs/deployment.md` as manual steps for the user: branch protection on `main` that requires the CI checks, plus one approving review when more than one person maintains the project.
+
 ## Before handoff
 
 You usually cannot run the workflow, so check what you can:
@@ -96,6 +139,8 @@ You usually cannot run the workflow, so check what you can:
 - [ ] Action versions and the Playwright image tag were looked up, and the tag matches `@playwright/test` in `package-lock.json`
 - [ ] Screenshot baselines exist for the pipeline image, or `docs/deployment.md` tells the user how to generate them on the first run
 - [ ] No secret value is in any file
+- [ ] The audit check, `npm sbom` and the licence check run locally, and their results are in the handoff note
+- [ ] `dependabot.yml` and `codeql.yml` parse, and the manual repository settings are listed in `docs/deployment.md`
 - [ ] The handoff note labels the pipeline Not verified until it has run, and says what to look at on the first run
 
 ## Deployment
