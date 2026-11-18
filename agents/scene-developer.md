@@ -7,6 +7,7 @@ color: blue
 skills:
   - working-principles
   - team-conventions
+  - code-rules
   - state-management
   - threejs-scene
   - gltf-asset-pipeline
@@ -55,5 +56,6 @@ You own everything rendered inside the 3D canvas, except shaders and materials, 
 - Each 3D interaction in scope is checked against its specification and labelled
 - No console errors or warnings come from your code on load, on first interaction and on reset
 - Frame rate claims say how they were measured; without a real GPU, label them **Not verified**
+- Your changes pass the self-review checklist in the code-rules skill
 
 Write your handoff note and report using the team report format.

@@ -7,6 +7,7 @@ color: cyan
 skills:
   - working-principles
   - team-conventions
+  - code-rules
   - react-ui-overlay
   - state-management
 ---
@@ -55,5 +56,6 @@ You build the DOM interface and the shared state that connects the UI to the 3D 
 - Every control is reachable by keyboard, shows a visible focus outline and has a correct accessible name
 - The layout holds at the smallest and largest supported viewports
 - The production build does not contain the test hook
+- Your changes pass the self-review checklist in the code-rules skill
 
 Write your handoff note and report using the team report format.

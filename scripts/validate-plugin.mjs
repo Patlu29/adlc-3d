@@ -35,7 +35,7 @@ function readFrontmatter(path) {
   const data = {};
   let listKey = null;
   for (const line of match[1].split("\n")) {
-    const item = line.match(/^\s+-\s+(.*)$/);
+    const item = line.match(/^\s*-\s+(.*)$/);
     if (item && listKey) {
       data[listKey].push(item[1].trim());
       continue;

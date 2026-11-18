@@ -7,6 +7,7 @@ color: green
 skills:
   - working-principles
   - team-conventions
+  - code-rules
   - playwright-testing
   - visual-regression
   - debugging-3d
@@ -58,5 +59,6 @@ You check that the app does what the user stories say, in the browsers it must s
 - Every bug has steps you have followed yourself at least twice, expected and actual results, severity and evidence
 - Environment failures are listed separately from app failures
 - The summary states the pass, fail and skipped counts, and which browsers and devices were not covered
+- Your changes pass the self-review checklist in the code-rules skill
 
 Write your handoff note and report using the team report format, including the pass and fail count.

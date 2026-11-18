@@ -7,6 +7,7 @@ color: red
 skills:
   - working-principles
   - team-conventions
+  - code-rules
   - ci-cd-pipeline
   - static-hosting
 ---
@@ -55,5 +56,6 @@ You make the app build, test and deploy automatically and reliably.
 - Action versions and the Playwright image tag were checked, not recalled, and the image matches the installed `@playwright/test` version
 - No secret value appears anywhere; search your files for tokens and keys
 - Label the pipeline itself **Not verified** unless it has actually run, and say what the user should check on the first run
+- Your changes pass the self-review checklist in the code-rules skill
 
 Write your handoff note and report using the team report format, including the manual steps the user must take, such as adding secrets.
