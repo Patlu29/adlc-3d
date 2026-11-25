@@ -23,7 +23,7 @@ If the idea is empty and no iteration is in progress, ask the user what the app 
 - **A phase exits on its criteria, not on effort.** Compare the evidence with the exit criteria one by one. If one is unmet, the phase is not done, however much work went into it.
 - **Agree the joins before building in parallel.** Parallel agents fail where their work meets: the shared store, the test hook, asset names. The contracts must exist before the Build phase starts.
 - **Find contradictions early.** A conflict between the requirements, design spec and architecture costs minutes to fix in a document and hours to fix in code. Check for them at every gate.
-- **Decisions belong to the user.** Scope, design and release are approved by the user at gates A1, A2 and A3, unless the state file records another approval mode. Only the user can change the mode.
+- **Decisions belong to the user.** Scope, design and release are approved by the user at gates A1, A2 and A3, and the build on staging at UAT before any production deploy, unless the state file records another approval mode. UAT is asked for in every mode. Only the user can change the mode.
 - **Stop when a fix is not working.** If the same failure comes back after a fix, do not send the same agent the same instruction again. Diagnose the cause first.
 - **Keep the record current.** If this session ended now, the state file and the handoff notes must be enough for a new session to continue.
 - **Report what is true.** Tell the user what was verified, what was not, and what is still broken.
@@ -33,7 +33,7 @@ If the idea is empty and no iteration is in progress, ask the user what the app 
 
 Do this before delegating anything.
 
-1. **Resume or start.** If `docs/project-status.md` exists, read it and the handoff notes, tell the user the current iteration, phase and approval mode, keep that mode, and continue from there instead of starting again. If the last iteration is closed and the user has a new request, treat it as a new iteration and choose its type and route from the lifecycle skill.
+1. **Resume or start.** If `docs/project-status.md` has a `## Paused for INC-<n>` section, an incident's hotfix iteration is current; continue that, and resume the paused one only after it closes, as the lifecycle skill describes. If `docs/project-status.md` exists, read it and the handoff notes, tell the user the current iteration, phase and approval mode, keep that mode, and continue from there instead of starting again. If the last iteration is closed and the user has a new request, treat it as a new iteration and choose its type and route from the lifecycle skill.
 2. **Project folder.** Confirm with the user where the app will live. Never scaffold into a folder that holds unrelated files.
 3. **Environment.** Check `node --version`, `npm --version` and that the npm registry is reachable (`npm ping`). If the registry needs credentials or is blocked, stop and ask the user how to proceed. Never change the user's npm or git configuration.
 4. **Tracker and source control.** Ask the user which tracker to use (ClickUp, a local board, or none), with the content mode for ClickUp, and whether you may commit at phase exits. Ask in one message, with your recommendation: a tracker if the team uses one, and commits on. The card-tracking and git-flow skills say what each answer means.
@@ -61,9 +61,11 @@ Run in two steps, because the design depends on the architecture. Move the cards
 
 **Architecture.** Delegate to the architect, passing the user's answers. Check before continuing: `npm install` and `npm run build` succeed on the scaffold; every script in the project-structure skill exists (`test:e2e` runs later, once QA has added its config); `docs/architecture.md` has a **Contracts** section covering the store, the test hook and the asset manifest; installed versions are recorded. If the architecture forces a choice the user would not expect, such as adding a backend or leaving the default stack, raise it with the user now instead of waiting for A2.
 
+**Threat model.** If the lifecycle skill's trigger applies (always on a new application), delegate to the security-engineer for `docs/security/threat-model.md`. Route each mitigation it asks for to its owner, and new requirements to the product-manager. Otherwise record it as Skipped with the reason.
+
 **Experience design.** Delegate to the ux-ui-designer. Check: every story in scope has its interactions and states specified; the design spec does not contradict the requirements or itself; any store field or test-hook entry the design needs is in the contracts. If the contracts need to change, send that to the architect before the gate.
 
-**Approval A2, design:** summarise the stack, whether a backend is needed, the notable decisions, the layout, the visual direction and the key interactions. Ask the user to approve the design as a whole.
+**Approval A2, design:** summarise the stack, whether a backend is needed, the notable decisions, the main threats and their mitigations, the layout, the visual direction and the key interactions. Ask the user to approve the design as a whole.
 
 ## 3. Build
 
@@ -122,13 +124,24 @@ Stop after two fix rounds on the same bug, as the lifecycle skill describes. If 
 
 **Exit check:** no critical finding is open; the code review covers the last code change; the QA results are from after the last code change; every traceability gap is explained; the readiness report states what is not verified.
 
-**Approval A3, release:** give the user the readiness summary and your recommendation, and ask whether to release. If the user approves with known issues, record which ones. Ask separately whether they want anything deployed, and whether to push the branch and open a pull request as the git-flow skill describes; approval to release is approval to prepare the release, not to deploy or push it. Move the cards in scope to ready_for_release with a note of the approval.
+Before the readiness report, if the threat model was written or the trigger applies, delegate the security review to the security-engineer. Route critical and major SEC findings to their owners as with review findings; a major one the user does not want fixed now is recorded as an accepted known issue.
+
+**Approval A3, release:** give the user the readiness summary, the proposed release version and your recommendation, and ask whether to release. If the user approves with known issues, record which ones. Ask separately whether they want anything deployed, and whether to push the branch and open a pull request as the git-flow skill describes; approval to release is approval to prepare the release, not to deploy or push it. Move the cards in scope to ready_for_release with a note of the approval. Record `Release: <version>` in the state file, and with a tracker run `release start --version <version> --cards <IDs in scope, plus the bugs fixed in this iteration>`.
 
 ## 6. Release
 
-Delegate to the devops-engineer: the pipeline, the hosting configuration, `docs/deployment.md` and an entry in `CHANGELOG.md` for this iteration. Do not tell it to deploy, push or create cloud resources unless the user explicitly approved that action in this conversation, and quote that approval in the delegation prompt.
+**6a Prepare.** Run `release notes --version <version> --print` if a tracker is set up, and pass the draft in the delegation. Delegate to the devops-engineer: the pipeline, the hosting configuration, `docs/deployment.md` with its environments and rollback section, and the `CHANGELOG.md` entry for the release version. Do not tell it to deploy, push or create cloud resources unless the user explicitly approved that action in this conversation, and quote that approval in the delegation prompt.
 
-**Exit check:** the workflow runs the same scripts that pass locally; no secret values appear in any file; `docs/deployment.md` lists the manual steps for the user; the changelog entry matches what was built.
+**Exit check:** the workflow runs the same scripts that pass locally; no secret values appear in any file; `docs/deployment.md` lists the environments, the manual steps for the user and how to roll back; the changelog entry matches what was built.
+
+**6b Deploy.** Only after the user has merged the change and asked for a deploy (or, for an incident's hotfix, from its own branch before the merge), and in this order, each on its own explicit approval in chat:
+
+1. Staging: the devops-engineer's documented deploy, or the user runs it. Then delegate the deployed spec against the staging address to the qa-engineer.
+2. **Approval UAT:** show the user the staging result and the address, and ask them to sign off. With ClickUp approvals on, also run `gate request --gate UAT --version <version> --build <full SHA deployed> --text "<summary>"`, and `gate status --gate UAT --version <version> --build <full SHA on staging now>` before going on. Without staging, follow the lifecycle skill.
+3. Production: deploy, then delegate the deployed spec against production to the qa-engineer.
+4. Tag and push `v<version>` as the git-flow skill describes, then `release ship --version <version>` and move the cards to done.
+
+If the user does not want it deployed now, record the release as awaiting merge and deploy, and carry on to phase 7.
 
 ## 7. Operate and learn
 
@@ -137,7 +150,7 @@ Delegate to the devops-engineer: the pipeline, the hosting configuration, `docs/
 3. Delegate to the product-manager to add that list to `docs/requirements/backlog.md`, quoting it in full, and to mark this iteration's items Done. Each item gets an ID.
 4. Write this iteration's section of `docs/lifecycle/retrospective.md`, citing the backlog IDs the product-manager created.
 5. Run `push` so the new backlog items have cards, then `sprint close`, and send the closed notification if notifications are on. If the pull request is merged, move the iteration's cards to done; if not, leave them in ready_for_release and say so.
-6. Close the iteration in the state file: outcome, date, the branch and pull request, and what carries forward.
+6. Close the iteration in the state file: outcome, date, the branch and pull request, the release version and whether it is deployed, and what carries forward.
 
 **Exit check:** the retrospective is written; nothing known is missing from the backlog; the state file shows the iteration closed.
 

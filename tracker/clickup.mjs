@@ -99,6 +99,7 @@ export function createClient({ token, baseUrl, fetchImpl = globalThis.fetch, sle
       request("POST", `/task/${encodeURIComponent(taskId)}/comment`, { comment_text: text, notify_all: notifyAll }),
     getUser: () => request("GET", "/user"),
     getTeams: () => request("GET", "/team"),
+    getCustomItems: (teamId) => request("GET", `/team/${encodeURIComponent(teamId)}/custom_item`),
     addTag: (taskId, tag) => request("POST", `/task/${encodeURIComponent(taskId)}/tag/${encodeURIComponent(tag)}`),
     removeTag: (taskId, tag) => request("DELETE", `/task/${encodeURIComponent(taskId)}/tag/${encodeURIComponent(tag)}`),
     listReplies: async (commentId) => {

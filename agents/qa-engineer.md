@@ -42,7 +42,7 @@ You check that the app does what the user stories say, in the browsers it must s
 - Write clear, reproducible bug reports with the owning agent named
 - On a re-test, re-run the whole suite, not only the fixed bug
 - On a change iteration, run the full regression suite for everything already released, as well as the tests for the change
-- When asked to check a deployed build, run only the deployed spec described in the playwright-testing skill against the address in your task prompt, and report it separately from local results. The test hook is absent from production, so the other specs cannot run there
+- When asked to check a deployed build, run only the deployed spec described in the playwright-testing skill against the address in your task prompt, and report it separately from local results, naming the environment (staging or production) and the commit SHA deployed. The test hook is absent from deployed builds, so the other specs cannot run there
 
 ## Outputs
 - `tests/e2e/` and `playwright.config.ts`

@@ -132,12 +132,24 @@ export function parseBugs(text) {
   return bugs;
 }
 
+// docs/incidents/INC-3.md: "# INC-3: <title>" then "Severity:", "Status:", "Release:" lines.
+export function parseIncident(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  const heading = lines.map((l) => /^#\s+(INC-\d+)\s*:\s*(.+)$/.exec(l.trim())).find(Boolean);
+  if (!heading) return null;
+  const field = (name) => lines.map((l) => new RegExp(`^(?:[-*]\\s+)?(?:\\*\\*)?${name}(?:\\*\\*)?\\s*:\\s*(.+)$`, "i").exec(l.trim())).find(Boolean)?.[1].trim() || "";
+  // "Sev 2", "SEV-2" and "sev2" all mean sev2.
+  const severity = field("Severity").toLowerCase().replace(/[\s_-]/g, "").match(/^sev[1-4]/)?.[0] || "";
+  return { id: heading[1], kind: "incident", title: heading[2].trim(), severity, status: field("Status"), release: field("Release") };
+}
+
 // The state a card starts in when it is first created. After that only `move` changes it.
 export function initialState(card) {
   const status = String(card.status || card.fields?.status || "").toLowerCase();
   if (/^(done|declined|fixed|closed)/.test(status)) return "done";
   if (/^in progress/.test(status) || /^reopened/.test(status)) return "in_progress";
   if (card.kind === "bug" && !status) return "ready";
+  if (card.kind === "incident") return /^resolved/.test(status) ? "done" : /^mitigated/.test(status) ? "in_review" : "in_progress";
   return "backlog";
 }
 
@@ -191,6 +203,15 @@ export function renderCard(card, { content = "full", results = {}, parentTitle =
     if (card.links) lines.push(`Links: ${card.links}`);
     if (!minimal && card.source) lines.push(`Source: ${card.source}`);
     lines.push("", "Recorded in docs/requirements/backlog.md");
+  } else if (card.kind === "incident") {
+    priority = { sev1: 1, sev2: 2, sev3: 3, sev4: 4 }[card.severity] ?? null;
+    lines.push(`Incident ${card.id}${card.severity ? ` | ${card.severity}` : ""}${card.release ? ` | release ${card.release}` : ""}`);
+    if (card.status) lines.push(`Status: ${card.status}`);
+    lines.push("", `Record and postmortem: docs/incidents/${card.id}.md`);
+  } else if (card.kind === "release") {
+    lines.push(`Release ${card.version}${card.date ? ` | shipped ${card.date}` : ""}`);
+    lines.push("", `Cards: ${card.cards.join(", ")}`);
+    lines.push("", "Release notes: CHANGELOG.md");
   } else if (card.kind === "iteration") {
     lines.push(`Sprint ${card.number} | ${card.start} to ${card.end} | capacity ${card.capacity} pts | committed ${card.committedPoints} pts`);
     lines.push("", `Cards: ${card.cards.join(", ")}`);
@@ -234,6 +255,6 @@ export function readiness(story, allIds) {
 
 // "[US-3] Rotate the model" -> "US-3"; "[US-3/scene-developer] ..." -> "US-3/scene-developer"
 export function idFromName(name) {
-  const match = /^\[([A-Z]+-\d+(?:\/[a-z][a-z-]*)?)\]/.exec(String(name || ""));
+  const match = /^\[((?:REL-\d+\.\d+\.\d+)|[A-Z]+-\d+(?:\/[a-z][a-z-]*)?)\]/.exec(String(name || ""));
   return match ? match[1] : null;
 }

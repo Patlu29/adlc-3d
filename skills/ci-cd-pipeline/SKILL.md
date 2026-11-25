@@ -20,7 +20,8 @@ user-invocable: false
 | Security | `npm audit`, SBOM, licence check | Every pull request and `main` |
 | Code scanning | CodeQL | Pull requests, `main` and weekly |
 | Preview deploy | Host-specific | Pull requests |
-| Production deploy | Host-specific | `main`, after every check passes, with approval |
+| Staging deploy | Host-specific | A manual run with the commit SHA as input, for a commit on `main` or a `fix/INC-*` hotfix branch whose checks passed, through the `staging` environment |
+| Production deploy | Host-specific | A manual run on a commit already on staging, through the `production` environment with required reviewers |
 
 ## Workflow
 
@@ -146,7 +147,12 @@ You usually cannot run the workflow, so check what you can:
 ## Deployment
 
 - Preview deployments on pull requests, so reviewers can try the 3D scene on their own devices
-- Production deployment only from `main`, only after every check passes, and behind a GitHub environment with required reviewers
+- Three environments, written up in `docs/deployment.md` with their addresses: preview, staging (for user acceptance) and production
+- Staging deploys only from a manual run (`workflow_dispatch` with the full commit SHA as input) through a GitHub environment named `staging`, for a commit on `main` or on a `fix/INC-*` hotfix branch whose checks have passed. Merging never deploys by itself. Production deploys only a commit that is already on staging, from a manual run (`workflow_dispatch` with the commit SHA as input) through an environment named `production` with required reviewers, so UAT always signs off the exact build that goes live
+- Each deploy job prints the full commit SHA it deployed, so the staging check and UAT can name the build
+- A hotfix is deployed from its own branch by SHA, so unreleased work on `main` does not ship with it. Once it is in production, it is merged back into `main`
+- `docs/deployment.md` has a **Rollback** section: how to put the last good release back on each environment (the host's rollback, or a manual run of the production job with the previous tag's SHA, the one exception to "already on staging", because that build was accepted when it shipped), who can do it, and how to check it worked
+- Environments and their reviewers are repository settings, not files; list them as manual steps for the user
 - Never deploy to production, push to a remote or create cloud resources unless the task prompt says the user approved it
 
 ## Secrets

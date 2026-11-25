@@ -43,6 +43,8 @@ const mock = {
   clock: Date.now(),
   replies: new Map(), // comment id -> [comments]
   webhooks: [], // { path, body }
+  customItems: [{ id: 1, name: "milestone" }, { id: 4, name: "meeting_note" }],
+  refuseCustomItem: false,
 };
 
 // Adds a comment as someone other than the token owner, as a person in ClickUp would.
@@ -97,6 +99,7 @@ const server = createServer((req, res) => {
       return send(200, { tasks: slice, last_page: (page + 1) * mock.pageSize >= all.length });
     }
     if (req.method === "POST" && path === `/list/${LIST}/task`) {
+      if (body.custom_item_id != null && mock.refuseCustomItem) return send(400, { err: "Custom task type not available", ECODE: "ITEM_225" });
       mock.seq += 1;
       const id = `t${mock.seq}`;
       const task = {
@@ -110,6 +113,7 @@ const server = createServer((req, res) => {
         parent: body.parent || null,
         url: `https://app.clickup.test/t/${id}`,
         points: body.points ?? null,
+        custom_item_id: body.custom_item_id ?? 0,
         due_date: null,
         comments: [],
         thread: [],
@@ -158,6 +162,7 @@ const server = createServer((req, res) => {
       return send(200, {});
     }
     if (req.method === "GET" && path === "/user") return send(200, { user: OWNER });
+    if (req.method === "GET" && /^\/team\/[^/]+\/custom_item$/.test(path)) return send(200, { custom_items: mock.customItems });
     if (req.method === "GET" && path === "/team")
       return send(200, { teams: [{ id: "77", name: "Test", members: [OWNER, ALEX, SAM].map((user) => ({ user })) }] });
     return send(404, { err: `no mock for ${req.method} ${path}` });
@@ -687,6 +692,111 @@ try {
     writeFileSync(join(sp, "docs", "requirements", "user-stories.md"), STORIES);
     r = await run(sp, ["push"]);
     ok(tasksNamed("US-1")[0].points === null, "removing an estimate clears the points in ClickUp", r.out);
+  }
+
+  // ---------- 4.2: incidents, releases, UAT ----------
+  {
+    mock.tasks.clear();
+    mock.fail = [];
+    const rp = makeProject();
+    mkdirSync(join(rp, "docs", "incidents"), { recursive: true });
+    writeFileSync(join(rp, "docs", "incidents", "INC-1.md"), "# INC-1: Model fails to load on Safari\n\nSeverity: sev2\nStatus: open\nRelease: 1.0.0\n");
+    writeFileSync(join(rp, "docs", "incidents", "notes.md"), "# not an incident\n");
+    await run(rp, ["init", "--provider", "clickup", "--list", LIST]);
+    let r = await run(rp, ["push"]);
+    const inc = tasksNamed("INC-1")[0];
+    ok(r.code === 0 && inc && inc.priority === 2 && inc.tags.includes("adlc-incident") && inc.status.status === "in progress", "an incident file becomes a card with priority from its severity", r.out);
+    ok(tasksNamed("notes").length === 0, "only INC-n files are incidents");
+
+    // Release with a Milestone card
+    r = await run(rp, ["release", "start", "--version", "1.1.0", "--cards", "US-1,BUG-1,INC-1"]);
+    const rel = tasksNamed("REL-1.1.0")[0];
+    ok(r.code === 0 && rel && rel.custom_item_id === 1 && rel.tags.includes("adlc-release"), "release start creates a Milestone card using the workspace's type", r.out);
+    ok(tasksNamed("US-1")[0].tags.includes("release-1.1.0") && tasksNamed("INC-1")[0].tags.includes("release-1.1.0"), "cards in the release are tagged");
+    r = await run(rp, ["release", "start", "--version", "1.1.0", "--cards", "US-1"]);
+    ok(r.code === 0 && tasksNamed("REL-1.1.0").length === 1, "release start can be run again without a duplicate card", r.out);
+    r = await run(rp, ["release", "start", "--version", "1.1", "--cards", "US-1"]);
+    ok(r.code === 1, "a version must be x.y.z", r.out);
+    r = await run(rp, ["release", "notes", "--version", "1.1.0", "--print"]);
+    ok(r.code === 0 && /### Added\n- Rotate the model \(US-1\)/.test(r.out) && /### Fixed[\s\S]*Drag stops after one second \(BUG-1\)/.test(r.out) && /Model fails to load on Safari \(INC-1\)/.test(r.out), "release notes group stories and fixes from the documents", r.out);
+    mock.fail.push({ method: "PUT", pattern: /^\/task\//, status: 503, times: 20 });
+    r = await run(rp, ["release", "ship", "--version", "1.1.0"]);
+    const shipArgv = state(rp).pending[0]?.argv || [];
+    ok(r.code === 3 && shipArgv.includes("--date"), "a queued ship keeps its date", shipArgv.join(" "));
+    mock.fail = [];
+    r = await run(rp, ["board"]);
+    r = await run(rp, ["move", "US-1", "--state", "done"]);
+    ok(tasksNamed("REL-1.1.0")[0].status.status === "complete" && state(rp).releases["1.1.0"].shipped, "the replayed ship closes the release card", r.out);
+    r = await run(rp, ["release", "start", "--version", "1.1.0", "--cards", "US-2"]);
+    ok(r.code === 1 && /already shipped/.test(r.out), "a shipped release cannot be reopened", r.out);
+
+    // Milestone type refused: fall back to a tagged task
+    mock.refuseCustomItem = true;
+    r = await run(rp, ["release", "start", "--version", "1.2.0", "--cards", "US-2"]);
+    const rel2 = tasksNamed("REL-1.2.0")[0];
+    ok(r.code === 0 && rel2 && rel2.custom_item_id === 0 && rel2.tags.includes("adlc-release") && /refused the Milestone/.test(r.out), "a refused Milestone type falls back to a tagged task", r.out);
+    mock.refuseCustomItem = false;
+
+    // UAT gate is tied to a build
+    await run(rp, ["sprint", "start", "--number", "1", "--goal", "Fix Safari", "--start", "2026-01-01", "--end", "2026-01-10", "--capacity", "5", "--cards", "BUG-1"]);
+    await run(rp, ["sprint", "close"]);
+    await run(rp, ["config", "--clickup-approvals", "on"]);
+    await run(rp, ["approvers", "add", "alex"]);
+    const shaA = "a".repeat(40);
+    const shaB = "b".repeat(40);
+    r = await run(rp, ["gate", "request", "--gate", "UAT", "--version", "1.2.0", "--build", "abc1234", "--text", "Staging check passed"]);
+    ok(r.code === 1 && /full 40-character/.test(r.out), "a UAT request needs the full staging SHA", r.out);
+    r = await run(rp, ["gate", "request", "--gate", "UAT", "--build", shaA, "--text", "Staging check passed"]);
+    ok(r.code === 1 && /--version/.test(r.out), "a UAT request names the release", r.out);
+    r = await run(rp, ["gate", "request", "--gate", "UAT", "--version", "1.2.0", "--build", shaA, "--text", "Staging check passed, see docs/deployment.md"]);
+    const relCard = tasksNamed("REL-1.2.0")[0];
+    ok(r.code === 0 && relCard.thread.some((c) => /Approval UAT/.test(c.comment_text)), "UAT is requested on the release card", r.out);
+    r = await run(rp, ["move", "US-2", "--state", "ready", "--note", "approve UAT"]);
+    ok(r.code === 1 && /reads like a gate decision/.test(r.out), "the tracker never posts a UAT decision", r.out);
+    addComment(relCard.id, ALEX, "Approve UAT");
+    r = await run(rp, ["gate", "status", "--gate", "UAT", "--version", "1.2.0", "--build", shaA.toUpperCase()]);
+    ok(/Approval UAT: approved/.test(r.out) && !/Stale/.test(r.out), "a UAT approval of the same build is found", r.out);
+    r = await run(rp, ["gate", "status", "--gate", "UAT", "--version", "1.2.0", "--build", shaB]);
+    ok(r.code === 2 && /Stale/.test(r.out), "a UAT approval goes stale when staging runs another build", r.out);
+
+    // Sprint pause and resume for a hotfix
+    await run(rp, ["sprint", "start", "--number", "2", "--goal", "Feature work", "--start", "2026-01-12", "--end", "2026-01-20", "--capacity", "5", "--cards", "US-2"]);
+    r = await run(rp, ["sprint", "pause", "--reason", "INC-1"]);
+    ok(r.code === 0 && state(rp).activeSprint === null, "sprint pause frees the way for a hotfix sprint", r.out);
+    r = await run(rp, ["sprint", "start", "--number", "3", "--goal", "Hotfix INC-1", "--start", "2026-01-13", "--end", "2026-01-14", "--capacity", "2", "--cards", "INC-1"]);
+    ok(r.code === 0, "the hotfix sprint starts while the other is paused", r.out);
+    r = await run(rp, ["sprint", "start", "--number", "2", "--goal", "Feature work", "--start", "2026-01-12", "--end", "2026-01-20", "--capacity", "5", "--cards", "US-2"]);
+    ok(r.code === 1, "a paused sprint cannot be restarted with sprint start", r.out);
+    r = await run(rp, ["sprint", "resume", "--number", "2"]);
+    ok(r.code === 1 && /sprint 3 is open/.test(r.out), "a paused sprint resumes only after the hotfix sprint closes", r.out);
+    await run(rp, ["sprint", "close"]);
+    r = await run(rp, ["sprint", "resume", "--number", "2"]);
+    ok(r.code === 0 && state(rp).activeSprint === 2, "the paused sprint resumes", r.out);
+
+    // Ship shows its date; notes need a version
+    r = await run(rp, ["release", "ship", "--version", "1.2.0", "--date", "2026-01-15"]);
+    ok(r.code === 0 && /shipped 2026-01-15/.test(tasksNamed("REL-1.2.0")[0].description), "the release card shows the ship date", tasksNamed("REL-1.2.0")[0].description);
+    r = await run(rp, ["release", "notes"]);
+    ok(r.code === 1 && /needs --version/.test(r.out), "release notes asks for the version", r.out);
+
+    // Severity spellings, and a workspace whose plan has no custom task types
+    writeFileSync(join(rp, "docs", "incidents", "INC-2.md"), "# INC-2: Slow first load\n\nSeverity: SEV-1\nStatus: open\n");
+    await run(rp, ["push"]);
+    ok(tasksNamed("INC-2")[0]?.priority === 1, "SEV-1 is read as sev1", JSON.stringify(tasksNamed("INC-2")[0]?.priority));
+    const cfgPath2 = join(rp, "docs", "tracker", "config.json");
+    const cfg2 = JSON.parse(readFileSync(cfgPath2, "utf8"));
+    delete cfg2.milestoneType;
+    writeFileSync(cfgPath2, JSON.stringify(cfg2));
+    const savedItems = mock.customItems;
+    mock.fail.push({ method: "GET", pattern: /custom_item$/, status: 400, times: 1 });
+    r = await run(rp, ["release", "start", "--version", "1.3.0", "--cards", "US-2"]);
+    ok(r.code === 0 && tasksNamed("REL-1.3.0")[0]?.custom_item_id === 0, "a failed task-type lookup falls back to a tagged task", r.out);
+    mock.fail = [];
+    mock.customItems = savedItems;
+
+    // Incident notification
+    r = await run(rp, ["notify", "--event", "incident", "--text", "INC-1 sev2: Safari cannot load the model"]);
+    ok(r.code === 0 && /No notification channel/.test(r.out), "the incident event is accepted", r.out);
   }
 
 } finally {

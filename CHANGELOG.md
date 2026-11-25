@@ -2,6 +2,28 @@
 
 All notable changes to this plugin. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the plugin uses [semantic versioning](https://semver.org/). Release notes with upgrade steps are on the [releases page](https://github.com/Patlu29/adlc-3d/releases).
 
+## [4.2.0] - 2026-11-25
+
+### Added
+- **security-engineer agent.** Writes a STRIDE threat model in Design and a security review with SEC findings in Review, covering untrusted 3D assets and decoders, the content security policy, uploads, authentication, third-party hosts and the OWASP Top 10. It runs when an iteration touches security, and always for a new application
+- **Release and deploy.** Phase 6 is split into 6a Prepare (at A3) and 6b Deploy (after the user merges): staging deploy, staging check, **Approval UAT**, production deploy of the same build, then the version tag. Every deploy and push needs its own approval; UAT is asked for in every approval mode
+- **Release versions.** `Release: x.y.z` in the state file is the single version source. Tracker commands `release start` (a Milestone card, looked up by name, falling back to a tagged task), `release notes --print` (a changelog draft from the documents) and `release ship`
+- **UAT approvals in ClickUp** on the release card, for the exact build on staging (`gate request --gate UAT --version <x.y.z> --build <full sha>`); a different build makes the decision stale
+- `sprint pause` and `sprint resume`, so an incident's hotfix iteration can run while another is paused
+- Staging is a manual deploy of a named commit, so merging never deploys; a hotfix deploys from its own branch
+- **`/adlc-3d:incident`.** Records the incident in `docs/incidents/INC-<n>.md`, triages severity, mitigates with a fresh approval for every rollback or deploy, fixes the cause in a hotfix iteration that pauses any open one, and writes a blameless postmortem. Incidents become `[INC-n]` cards through `push`, and notifications gain an `incident` event
+- The pipeline guidance adds staging and production environments, deploy jobs that print the deployed SHA, and a tested rollback section in `docs/deployment.md`
+
+### Changed
+- The security headers and OWASP evidence move from the architect's release review to the security-engineer; the architect keeps contracts and supply-chain controls, and does the codebase-wide security check itself when the security review is skipped
+- OWASP severity: exploitable now is critical and must be fixed, a missing control the threat model relies on is major and only the user can accept it, hardening is minor
+- Agents cannot write `docs/incidents/`; `docs/security/` belongs to the security-engineer
+- Test cases stay as acceptance criteria with results on the story cards, rather than cards of their own
+- Tests: 158 tracker checks and 89 hook checks
+
+### Upgrading
+- Existing projects keep working. A state file without a `Release:` line means releases are not versioned, and 6b runs only when the user asks for a deploy
+
 ## [4.1.0] - 2026-11-25
 
 ### Added

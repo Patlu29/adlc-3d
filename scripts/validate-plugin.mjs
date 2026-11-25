@@ -167,7 +167,7 @@ const lifecycle = skills.get(LIFECYCLE);
 if (!lifecycle) {
   fail(`skills/${LIFECYCLE}/SKILL.md`, "missing; the lifecycle commands depend on it");
 } else {
-  for (const command of ["build", "change"]) {
+  for (const command of ["build", "change", "incident"]) {
     const skill = skills.get(command);
     if (!skill) fail(`skills/${command}/SKILL.md`, "missing");
     else if (!skill.body.includes(`${plugin?.name}:${LIFECYCLE}`))

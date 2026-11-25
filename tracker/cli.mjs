@@ -3,11 +3,11 @@
 // Run from the project root, or pass --project <dir>. See skills/card-tracking/SKILL.md.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SECRET_ENV, findSecret } from "../hooks/lib.mjs";
-import { STATES, hashRendered, idFromName, initialState, parseBacklog, parseBugs, parseStories, readiness, renderCard } from "./cards.mjs";
+import { STATES, hashRendered, idFromName, initialState, parseBacklog, parseBugs, parseIncident, parseStories, readiness, renderCard } from "./cards.mjs";
 import { TrackerError, createClient } from "./clickup.mjs";
 import { createHash } from "node:crypto";
 import { CHANNELS, sendNotifications } from "./notify.mjs";
@@ -16,11 +16,11 @@ import { acquireLock, loadState, readJson, releaseLock, renderBoard, trackerPath
 
 const EXIT = { ok: 0, usage: 1, user: 2, queued: 3, locked: 4, pending: 5, notReady: 6 };
 const BOOLEAN_FLAGS = new Set(["dry-run", "force", "write", "remote", "staged", "help", "print"]);
-const GATES = { A1: "scope", A2: "design", A3: "release" };
+const GATES = { A1: "scope", A2: "design", A3: "release", UAT: "user acceptance on staging" };
 // Text that reads as a gate decision. The tracker never posts it, so its own comments can never be
 // mistaken for an approver's.
-const DECISION_PHRASE = /^[\s*_>#`~-]*(approve[sd]?|reject(?:ed)?)\s+a[123]\b/i;
-const NOTIFY_EVENTS = { approval: "Approval needed", blocked: "Blocked, needs a decision", released: "Release approved", closed: "Iteration closed" };
+const DECISION_PHRASE = /^[\s*_>#`~-]*(approve[sd]?|reject(?:ed)?)\s+(?:a[123]|uat)\b/i;
+const NOTIFY_EVENTS = { approval: "Approval needed", blocked: "Blocked, needs a decision", released: "Release approved", closed: "Iteration closed", incident: "Incident" };
 const MINIMAL_NOTE_LIMIT = 280;
 
 const USAGE = `adlc-3d tracker
@@ -36,13 +36,19 @@ const USAGE = `adlc-3d tracker
   board [--remote]                    Print the board; --remote compares with ClickUp, read only
   ready [--stories <US-1,US-2>]       Definition of Ready check for the stories (no tracker needed)
   config [--content full|minimal] [--notify slack,teams|none] [--clickup-approvals on|off]
-  notify --event approval|blocked|released|closed --text <text> [--link <https URL>]
+  notify --event approval|blocked|released|closed|incident --text <text> [--link <https URL>]
   sprint start --number <n> --goal <text> --start <YYYY-MM-DD> --end <YYYY-MM-DD> --capacity <pts> --cards <IDs>
   sprint add|drop --cards <IDs>
   sprint report [--number <n>] [--print]
+  sprint pause --reason <INC-n>       sprint resume --number <n>
   sprint close
   gate request --gate A1|A2|A3 --text <summary>
-  gate status --gate A1|A2|A3 [--number <n>]   Read only
+  gate request --gate UAT --version <x.y.z> --build <full SHA> --text <summary>
+  gate status --gate A1|A2|A3 [--number <n>]          Read only
+  gate status --gate UAT --version <x.y.z> --build <full SHA>   Read only
+  release start --version <x.y.z> --cards <IDs>
+  release notes --version <x.y.z> [--print]   Read only; prints a draft for the CHANGELOG entry
+  release ship --version <x.y.z> [--date <YYYY-MM-DD>]
   approvers list                      approvers add|remove are for the user, in their own terminal
   secrets --staged                    Scan staged git changes for credentials
 
@@ -100,6 +106,15 @@ function clientFor(ctx) {
   return ctx.client;
 }
 
+function readIncidents(root) {
+  const dir = join(root, "docs", "incidents");
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f) => /^INC-\d+\.md$/.test(f))
+    .map((f) => parseIncident(readFileSync(join(dir, f), "utf8")))
+    .filter(Boolean);
+}
+
 function readCards(root) {
   const read = (rel) => (existsSync(join(root, rel)) ? readFileSync(join(root, rel), "utf8") : "");
   const cards = [
@@ -107,6 +122,7 @@ function readCards(root) {
     // QA bugs come before backlog rows, so a bug listed in both keeps its QA details.
     ...parseBugs(read("docs/qa-report.md")),
     ...parseBacklog(read("docs/requirements/backlog.md")),
+    ...readIncidents(root),
   ];
   // A bug in both the QA report and the backlog keeps its QA details and the backlog row's status.
   const byId = new Map();
@@ -152,6 +168,23 @@ async function listIndex(ctx) {
 
 function adopt(entry, task) {
   Object.assign(entry, { remoteId: task.id, key: keyOf(task), url: task.url || "" });
+}
+
+// A Milestone task type may be switched off or renamed in a workspace. If ClickUp refuses it, create a
+// normal task instead (it still carries the adlc-release tag) and stop asking for the type.
+async function createWithTypeFallback(ctx, body, send) {
+  if (body.custom_item_id == null) return send(body);
+  try {
+    return await send(body);
+  } catch (error) {
+    // Only a refusal of the task type itself; any other rejection is a real problem to report.
+    if (!(error instanceof TrackerError) || error.kind !== "request" || !/custom (task|item)|task type|ITEM_2\d\d/i.test(error.message)) throw error;
+    const { custom_item_id, ...rest } = body;
+    ctx.config.milestoneType = null;
+    writeJsonAtomic(ctx.paths.config, ctx.config);
+    say("ClickUp refused the Milestone task type, so the release card is a normal task tagged adlc-release.");
+    return send(rest);
+  }
 }
 
 // Story points need ClickUp's Sprint Points ClickApp. If the workspace rejects them, send the card
@@ -217,7 +250,8 @@ async function syncCard(ctx, card, { force = false, parentEntry = null, parentTi
       const status = config.statusMap?.[entry.state];
       const createBody = { ...body, tags: rendered.tags, ...(status ? { status } : {}) };
       if (card.kind === "task") createBody.parent = parentEntry.remoteId;
-      const task = await withoutPointsIfRejected(ctx, createBody, (b) => client.createTask(config.listId, b));
+      if (card.customItem != null) createBody.custom_item_id = card.customItem;
+      const task = await withoutPointsIfRejected(ctx, createBody, (b) => createWithTypeFallback(ctx, b, (c) => client.createTask(config.listId, c)));
       adopt(entry, task);
       save(ctx);
       outcome = "created";
@@ -644,6 +678,7 @@ async function sprintStart(ctx, flags) {
   if (open != null && open !== number) throw new UsageError(`sprint ${open} is still open. Close it first`);
   const existing = ctx.state.sprints[number];
   if (existing?.closed) throw new UsageError(`sprint ${number} is closed. Start the next sprint with a new number`);
+  if (existing?.paused) throw new UsageError(`sprint ${number} is paused. Use sprint resume --number ${number}`);
   if (existing) {
     const same = existing.goal === flags.goal && existing.start === flags.start && existing.end === flags.end && existing.capacity === capacity && [...Object.keys(existing.committed)].sort().join() === [...ids].sort().join();
     if (!same) throw new UsageError(`sprint ${number} was started with a different goal, dates, capacity or cards. Use sprint add or drop for scope changes`);
@@ -743,12 +778,142 @@ async function sprintClose(ctx) {
   return EXIT.ok;
 }
 
+// An incident's hotfix needs its own sprint while the current one waits.
+async function sprintPause(ctx, flags) {
+  const sprint = activeSprint(ctx);
+  if (!flags.reason) throw new UsageError("sprint pause needs --reason, such as INC-3");
+  sprint.paused = { at: new Date().toISOString(), reason: flags.reason };
+  ctx.state.activeSprint = null;
+  save(ctx);
+  say(`Sprint ${sprint.number} paused (${flags.reason}). Resume it with sprint resume --number ${sprint.number}.`);
+  return EXIT.ok;
+}
+
+async function sprintResume(ctx, flags) {
+  const number = Number(flags.number);
+  const sprint = ctx.state.sprints?.[number];
+  if (!sprint?.paused) throw new UsageError(`sprint ${flags.number} is not paused`);
+  if (ctx.state.activeSprint != null) throw new UsageError(`sprint ${ctx.state.activeSprint} is open. Close it first`);
+  sprint.pauses = [...(sprint.pauses || []), { ...sprint.paused, resumedAt: new Date().toISOString() }];
+  delete sprint.paused;
+  ctx.state.activeSprint = number;
+  save(ctx);
+  say(`Sprint ${number} resumed.`);
+  return EXIT.ok;
+}
+
 async function cmdSprint(ctx, { positional, flags }) {
   const [sub] = positional;
+  if (sub === "pause") return sprintPause(ctx, flags);
+  if (sub === "resume") return sprintResume(ctx, flags);
   if (sub === "start") return sprintStart(ctx, flags);
   if (sub === "add" || sub === "drop") return sprintChange(ctx, flags, sub);
   if (sub === "close") return sprintClose(ctx);
-  throw new UsageError("sprint takes start, add, drop, report or close");
+  throw new UsageError("sprint takes start, add, drop, report, pause, resume or close");
+}
+
+// ---------- releases ----------
+
+const SEMVER = /^\d+\.\d+\.\d+$/;
+
+// The workspace's Milestone task type, looked up once by name and kept in config.json.
+async function milestoneType(ctx) {
+  if (ctx.config.provider !== "clickup") return null;
+  if (ctx.config.milestoneType !== undefined) return ctx.config.milestoneType;
+  const client = clientFor(ctx);
+  try {
+    const team = ((await client.getTeams()).teams || [])[0];
+    const items = team ? (await client.getCustomItems(team.id)).custom_items || [] : [];
+    ctx.config.milestoneType = items.find((i) => /^milestone$/i.test(String(i.name)))?.id ?? null;
+  } catch (error) {
+    // A plan without custom task types refuses the lookup; use a tagged task. A network fault is retried later.
+    if (!(error instanceof TrackerError) || error.kind !== "request") throw error;
+    ctx.config.milestoneType = null;
+  }
+  writeJsonAtomic(ctx.paths.config, ctx.config);
+  return ctx.config.milestoneType;
+}
+
+async function releaseStart(ctx, flags) {
+  const version = flags.version;
+  if (!SEMVER.test(version || "")) throw new UsageError("--version must look like 1.3.0");
+  const ids = list(flags.cards);
+  if (!ids.length) throw new UsageError("release start needs --cards");
+  for (const id of ids) entryFor(ctx, id);
+  ctx.state.releases ||= {};
+  const existing = ctx.state.releases[version];
+  if (existing?.shipped) throw new UsageError(`release ${version} has already shipped`);
+  const release = (ctx.state.releases[version] ||= { version, cards: [], tagged: [], startedAt: new Date().toISOString(), shipped: null });
+  for (const id of ids) if (!release.cards.includes(id)) release.cards.push(id);
+  save(ctx);
+  const card = { id: `REL-${version}`, kind: "release", title: `Release ${version}`, version, cards: release.cards, initial: "in_progress", customItem: await milestoneType(ctx) };
+  const outcome = await syncCard(ctx, card);
+  for (const id of release.cards) {
+    if (release.tagged.includes(id)) continue;
+    const entry = ctx.state.cards[id];
+    if (ctx.config.provider === "clickup" && entry.remoteId) await clientFor(ctx).addTag(entry.remoteId, `release-${version}`);
+    release.tagged.push(id);
+    save(ctx);
+  }
+  say(`Release ${version}: ${release.cards.length} card(s). Release card REL-${version}: ${outcome}.`);
+  return EXIT.ok;
+}
+
+async function releaseShip(ctx, flags) {
+  const version = flags.version;
+  const release = ctx.state.releases?.[version];
+  if (!release) throw new UsageError(`there is no release ${version}. Run release start first`);
+  const date = flags.date || localDate(Date.now());
+  if (!isDate(date)) throw new UsageError("--date must be YYYY-MM-DD");
+  const entry = entryFor(ctx, `REL-${version}`);
+  const status = ctx.config.statusMap?.done;
+  try {
+    if (ctx.config.provider === "clickup" && status && entry.state !== "done") await clientFor(ctx).updateTask(entry.remoteId, { status });
+  } catch (error) {
+    // A queued replay keeps the real ship date.
+    error.retryArgv = ["release", "ship", "--version", version, "--date", date];
+    throw error;
+  }
+  if (entry.state !== "done") (entry.history ||= []).push({ state: "done", at: new Date(`${date}T12:00:00`).toISOString() });
+  entry.state = "done";
+  release.shipped = date;
+  save(ctx);
+  // Show the ship date on the release card.
+  await syncCard(ctx, { id: `REL-${version}`, kind: "release", title: `Release ${version}`, version, cards: release.cards, date, initial: "done" });
+  say(`Release ${version} recorded as shipped to production on ${date}.`);
+  return EXIT.ok;
+}
+
+// A draft for the devops-engineer's CHANGELOG entry, built from the documents. Read only.
+function cmdReleaseNotes(ctx, { flags }) {
+  requireConfig(ctx);
+  ctx.state = loadState(ctx.paths);
+  if (!SEMVER.test(flags.version || "")) throw new UsageError("release notes needs --version <x.y.z>");
+  const release = ctx.state.releases?.[flags.version];
+  if (!release) throw new UsageError(`there is no release ${flags.version}`);
+  const cards = new Map(readCards(ctx.root).map((c) => [c.id, c]));
+  const groups = { Added: [], Changed: [], Fixed: [] };
+  for (const id of release.cards) {
+    const card = cards.get(id);
+    if (!card) continue;
+    if (card.kind === "story") groups.Added.push(`${card.title} (${id})`);
+    else if (card.kind === "bug" || card.kind === "incident") groups.Fixed.push(`${card.title} (${id})`);
+    else if (card.kind === "change") groups.Changed.push(`${card.title} (${id})`);
+  }
+  const known = [...cards.values()].filter((c) => c.kind === "bug" && c.fields && !/^(fixed|closed|done)/i.test(c.fields.status || "") && !release.cards.includes(c.id));
+  const lines = [`## [${flags.version}]${release.shipped ? ` - ${release.shipped}` : ""}`, ""];
+  for (const [heading, items] of Object.entries(groups)) if (items.length) lines.push(`### ${heading}`, ...items.map((i) => `- ${i}`), "");
+  if (known.length) lines.push("### Known issues", ...known.map((b) => `- ${b.title} (${b.id}${b.fields.severity ? `, ${b.fields.severity}` : ""})`), "");
+  lines.push("Draft from the documents. Check it against the QA report and the release readiness report before it goes into CHANGELOG.md.");
+  say(lines.join("\n"));
+  return EXIT.ok;
+}
+
+async function cmdRelease(ctx, { positional, flags }) {
+  const [sub] = positional;
+  if (sub === "start") return releaseStart(ctx, flags);
+  if (sub === "ship") return releaseShip(ctx, flags);
+  throw new UsageError("release takes start, notes or ship");
 }
 
 // ---------- approvals on cards ----------
@@ -779,9 +944,22 @@ function fingerprint(root) {
   }
 }
 
+const FULL_SHA = /^[0-9a-f]{40}$/i;
+
+// Where a gate is asked and recorded: A1 to A3 on the sprint's iteration card, UAT on the release card.
+function gateTarget(ctx, gate, flags) {
+  if (gate === "UAT") {
+    if (!ctx.state.releases?.[flags.version]) throw new UsageError("UAT is for a release: pass --version <x.y.z> of a release started with release start");
+    if (!FULL_SHA.test(flags.build || "")) throw new UsageError("UAT approves a deployed build: pass --build with the full 40-character commit SHA on staging");
+    return { key: `release:${flags.version}:UAT`, cardId: `REL-${flags.version}`, label: `release ${flags.version}` };
+  }
+  const sprint = activeSprint(ctx, flags.number != null ? Number(flags.number) : undefined);
+  return { key: `${sprint.number}:${gate}`, cardId: `IT-${sprint.number}`, label: `iteration ${sprint.number}` };
+}
+
 function gateFrom(flags) {
   const gate = String(flags.gate || "").toUpperCase();
-  if (!GATES[gate]) throw new UsageError("--gate must be A1, A2 or A3");
+  if (!GATES[gate]) throw new UsageError("--gate must be A1, A2, A3 or UAT");
   return gate;
 }
 
@@ -791,12 +969,12 @@ async function gateRequest(ctx, flags) {
     throw new UsageError("ClickUp approvals are off for this project, so approvals are asked for in chat only");
   if (!(config.approvers || []).length) throw new UserError("no approvers are set. The user adds them in their own terminal with approvers add");
   const gate = gateFrom(flags);
-  const sprint = activeSprint(ctx);
-  const card = entryFor(ctx, `IT-${sprint.number}`);
+  const target = gateTarget(ctx, gate, flags);
+  const card = entryFor(ctx, target.cardId);
   if (!flags.text) throw new UsageError("gate request needs --text with a short summary");
-  checkNote(ctx, `IT-${sprint.number}`, flags.text);
+  checkNote(ctx, target.cardId, flags.text);
   const body = [
-    `Approval ${gate} (${GATES[gate]}) is requested for iteration ${sprint.number}.`,
+    `Approval ${gate} (${GATES[gate]}) is requested for ${target.label}.`,
     "",
     flags.text,
     "",
@@ -808,18 +986,19 @@ async function gateRequest(ctx, flags) {
   const response = await clientFor(ctx).addComment(card.remoteId, body, { notifyAll: true });
   rememberComment(ctx, response);
   ctx.state.gates ||= {};
-  ctx.state.gates[`${sprint.number}:${gate}`] = {
+  ctx.state.gates[target.key] = {
     requestCommentId: String(response.id || ""),
     requestedAt: String(response.date || Date.now()),
-    fingerprint: fingerprint(ctx.root),
+    // UAT covers the build on staging; the other gates cover the work in the repository.
+    fingerprint: gate === "UAT" ? `build:${flags.build.toLowerCase()}` : fingerprint(ctx.root),
   };
   save(ctx);
-  say(`Approval ${gate} requested on IT-${sprint.number}. Check it with gate status --gate ${gate}.`);
+  say(`Approval ${gate} requested on ${target.cardId}. Check it with gate status --gate ${gate}${gate === "UAT" ? ` --version ${flags.version} --build <SHA on staging>` : ""}.`);
   return EXIT.ok;
 }
 
 function parseDecision(text, gate) {
-  const match = /^[\s*_>#`~-]*(approve|reject)\s+(a[123])\b[\s:.,-]*([\s\S]*)$/i.exec(String(text || "").trim());
+  const match = /^[\s*_>#`~-]*(approve|reject)\s+(a[123]|uat)\b[\s:.,-]*([\s\S]*)$/i.exec(String(text || "").trim());
   if (!match || match[2].toUpperCase() !== gate) return null;
   const rest = match[3].trim();
   if (match[1].toLowerCase() === "reject") return { decision: "rejected", text: rest };
@@ -836,13 +1015,13 @@ async function cmdGateStatus(ctx, { flags }) {
   }
   ctx.state = loadState(ctx.paths);
   const gate = gateFrom(flags);
-  const sprint = activeSprint(ctx, flags.number != null ? Number(flags.number) : undefined);
-  const request = ctx.state.gates?.[`${sprint.number}:${gate}`];
+  const target = gateTarget(ctx, gate, flags);
+  const request = ctx.state.gates?.[target.key];
   if (!request) {
-    say(`No approval ${gate} has been requested for iteration ${sprint.number}.`);
+    say(`No approval ${gate} has been requested for ${target.label}.`);
     return EXIT.pending;
   }
-  const card = entryFor(ctx, `IT-${sprint.number}`);
+  const card = entryFor(ctx, target.cardId);
   const client = clientFor(ctx);
   // A test server can say anything, so nothing read from one is ever a decision.
   const testServer = Boolean(process.env.CLICKUP_API_URL);
@@ -853,7 +1032,7 @@ async function cmdGateStatus(ctx, { flags }) {
   // The request time comes from ClickUp's copy of the request comment, not from the local record.
   const requestComment = comments.find((c) => String(c.id) === request.requestCommentId);
   if (!requestComment) {
-    say(`The request comment for ${gate} is no longer on IT-${sprint.number}. Request the approval again.`);
+    say(`The request comment for ${gate} is no longer on ${target.cardId}. Request the approval again.`);
     return EXIT.user;
   }
   comments.push(...(await client.listReplies(request.requestCommentId)));
@@ -866,12 +1045,13 @@ async function cmdGateStatus(ctx, { flags }) {
     .filter((d) => d.decision)
     .sort((a, b) => a.at - b.at);
   if (!decisions.length) {
-    say(`Approval ${gate}: pending. No approver has answered on IT-${sprint.number}.`);
+    say(`Approval ${gate}: pending. No approver has answered on ${target.cardId}.`);
     return EXIT.pending;
   }
   if (testServer) say("TEST SERVER: CLICKUP_API_URL is set, so what follows is not a decision.");
   const [first] = decisions;
-  const stale = request.fingerprint && fingerprint(ctx.root) !== request.fingerprint;
+  const current = gate === "UAT" ? `build:${flags.build.toLowerCase()}` : fingerprint(ctx.root);
+  const stale = request.fingerprint && current !== request.fingerprint;
   const conflicting = decisions.some((d) => d.decision !== first.decision);
   say(`Approval ${gate}: ${first.decision}`);
   say(`By: ${first.by} in ClickUp, ${new Date(first.at).toLocaleString("en-AU")}`);
@@ -920,7 +1100,7 @@ async function cmdApprovers(ctx, { positional }) {
 
 // ---------- runner ----------
 
-const MUTATING = { push: cmdPush, move: cmdMove, task: cmdTask, comment: cmdComment, criteria: cmdCriteria, sprint: cmdSprint, gate: cmdGate };
+const MUTATING = { push: cmdPush, move: cmdMove, task: cmdTask, comment: cmdComment, criteria: cmdCriteria, sprint: cmdSprint, gate: cmdGate, release: cmdRelease };
 // A replayed approval request would carry the wrong time, so it is never queued.
 const NOT_QUEUED = new Set(["gate"]);
 
@@ -972,7 +1152,7 @@ async function runMutating(ctx, parsed, argv) {
     const dryRun = parsed.flags["dry-run"];
     try {
       // Closing a sprint is local bookkeeping; it must not wait for, or be queued behind, ClickUp.
-      const localOnly = parsed.command === "sprint" && parsed.positional[0] === "close";
+      const localOnly = parsed.command === "sprint" && ["close", "pause", "resume"].includes(parsed.positional[0]);
       if (ctx.config.provider === "clickup" && !dryRun && !localOnly) await replayPending(ctx);
       return await MUTATING[parsed.command](ctx, parsed);
     } catch (error) {
@@ -1012,6 +1192,7 @@ export async function main(argv) {
     const sub = parsed.positional[0];
     if (parsed.command === "sprint" && sub === "report") return cmdSprintReport(ctx, parsed);
     if (parsed.command === "gate" && sub === "status") return await cmdGateStatus(ctx, parsed);
+    if (parsed.command === "release" && sub === "notes") return cmdReleaseNotes(ctx, parsed);
     if (MUTATING[parsed.command]) return await runMutating(ctx, parsed, argv);
     if (parsed.command === "config") return await cmdConfig(ctx, parsed);
     if (parsed.command === "notify") return await cmdNotify(ctx, parsed);

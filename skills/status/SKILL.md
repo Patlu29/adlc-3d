@@ -20,6 +20,8 @@ Read whichever of these exist:
 6. `docs/requirements/backlog.md`: open items by priority
 7. `docs/tracker/board.md`: cards by state, if the state file has a `Tracker:` line other than none
 8. `docs/code-review.md`: open code-review findings by severity
+9. `docs/security/review.md`: open security findings by severity
+10. `docs/incidents/`: each incident's severity and status
 
 If `docs/project-status.md` does not exist, say that no lifecycle has been started in this folder and that `/adlc-3d:build` starts one. Then stop.
 
@@ -55,6 +57,10 @@ Keep it short enough to read in a minute:
 **Sprint:** <number, goal, points completed of committed, days left, or "no sprint">
 **Gate waiting:** <gate, and whether an approver has answered in ClickUp, or "none">
 **Branch:** <name, uncommitted changes, pull request open or merged, or "no git">
+**Release:** <version, and prepared, awaiting merge, awaiting deploy, on staging, UAT signed off or shipped, or "not versioned">
+**Security:** <open SEC findings by severity, or "not reviewed this iteration">
+**Incidents:** <open INC files with severity and status, or "none">
+**Paused:** <the iteration in the `Paused for INC-<n>` section, and its phase, or "none">
 **Not verified:** <items>
 **Backlog:** <count of open items, and the top three>
 **Next step:** <what happens next, and the command that does it>
@@ -62,4 +68,4 @@ Keep it short enough to read in a minute:
 
 State only what the documents and files show. If something is unknown, say it is unknown.
 
-For the next step, name the command: `/adlc-3d:build` to continue an open iteration, or `/adlc-3d:change` to start a new one.
+For the next step, name the command: `/adlc-3d:build` to continue an open iteration, `/adlc-3d:change` to start a new one or deploy a merged release, or `/adlc-3d:incident` for a production fault.

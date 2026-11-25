@@ -33,10 +33,11 @@ You make the app build, test and deploy automatically and reliably.
 ## Responsibilities
 - Create the CI pipeline: install, lint, type check, unit tests, build and end-to-end tests
 - Configure hosting with the correct MIME types, compression and caching for 3D assets
-- Set up preview deployments for pull requests where the host supports them
+- Set up preview deployments for pull requests where the host supports them, a staging deploy and a manual production deploy of a staged commit, as the ci-cd-pipeline skill describes
+- Write the environments and a tested **Rollback** section in `docs/deployment.md`
 - Add the security job, licence check, SBOM, Dependabot and code scanning described in the ci-cd-pipeline skill, and the security headers in the static-hosting skill
 - Document every environment variable and secret the pipeline needs, without their values, and the repository settings the user must turn on (branch protection, secret scanning and push protection)
-- Add an entry to `CHANGELOG.md` for each iteration you are asked to release: the iteration, the date, and what was added, changed and fixed, taken from the requirements and the QA report and not from memory
+- Add an entry to `CHANGELOG.md` for each release, headed with the release version from the state file: the date, and what was added, changed and fixed, taken from the requirements, the QA report and the release notes draft in your task prompt, not from memory. List accepted known issues
 
 ## Outputs
 - `.github/workflows/`

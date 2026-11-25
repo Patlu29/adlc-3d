@@ -77,7 +77,7 @@ The security rules in section 5 are the exception: only a user decision recorded
 
 ### OWASP Top 10 mapping
 
-The architect's release review and any security audit trace these rules to the OWASP Top 10 (2021). A breach of any row is **critical**.
+The security-engineer's review traces these rules to the OWASP Top 10 (2021). A breach that is exploitable in this app is **critical**; a missing control that the threat model relies on is **major**; hardening beyond that is **minor**. A critical finding must be fixed before release; only the user can accept a major one as a known issue.
 
 | OWASP category | Covered by |
 |---|---|

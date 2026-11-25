@@ -13,7 +13,7 @@ const BLOCKED_PATHS = [
 
 
 // Read only for every agent; only the Tech Lead (the main thread) writes these.
-const TECH_LEAD_ONLY = /^docs\/(project-status\.md$|lifecycle\/|tracker\/)/;
+const TECH_LEAD_ONLY = /^docs\/(project-status\.md$|lifecycle\/|tracker\/|incidents\/)/;
 
 // Test fixtures may hold throwaway keys, such as a PEM used to test an upload parser.
 const FIXTURES = /^tests\/(?:.+\/)?fixtures\//;
