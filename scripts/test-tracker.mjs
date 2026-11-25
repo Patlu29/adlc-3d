@@ -273,6 +273,7 @@ try {
     r = await run(dir, ["task", "--stories", "US-1,US-2", "--agent", "scene-developer"]);
     const sub = tasksNamed("US-1/scene-developer")[0];
     ok(r.code === 0 && sub && sub.parent === tasksNamed("US-1")[0].id && sub.status.status === "in progress", "task creates an agent sub-task under the story", r.out);
+    ok(sub && sub.name === "[US-1/scene-developer] scene-developer: Rotate the desk lamp", "an agent sub-task is named after its agent and story", sub?.name);
     r = await run(dir, ["task", "--stories", "US-1", "--agent", "scene-developer"]);
     ok(/unchanged/.test(r.out) && tasksNamed("US-1/scene-developer").length === 1, "task is idempotent", r.out);
 

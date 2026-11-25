@@ -181,7 +181,9 @@ export function renderCard(card, { content = "full", results = {}, parentTitle =
     lines.push(`Work by the ${card.agent} agent on ${card.parentId}${minimal || !parentTitle ? "" : `: ${parentTitle}`}`);
     lines.push("", `Handoff note: docs/handoffs/${card.agent}.md`);
   }
-  const name = `[${card.id}] ${minimal && card.kind === "task" ? card.agent : card.title}`.slice(0, 250);
+  // An agent task has no title of its own: it is named after its agent and, in full mode, its story.
+  const title = card.kind === "task" ? (minimal || !parentTitle ? card.agent : `${card.agent}: ${parentTitle}`) : card.title;
+  const name = `[${card.id}] ${title}`.slice(0, 250);
   const description = lines.join("\n");
   return { name, description, tags, priority };
 }
