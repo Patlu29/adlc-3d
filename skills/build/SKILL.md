@@ -43,13 +43,17 @@ Do this before delegating anything.
 
 ## 1. Plan
 
-Delegate to the product-manager: requirements, user stories and the backlog. For an iteration on an existing app, the task is to update the affected stories and move the chosen backlog items to In progress, keeping every existing ID.
+Delegate to the product-manager: requirements, user stories with estimates, and the backlog. For an iteration on an existing app, the task is to update the affected stories and move the chosen backlog items to In progress, keeping every existing ID.
 
 **Exit check:** every Must requirement has at least one story; every story has testable, numbered acceptance criteria with figures where behaviour is measurable; the non-functional targets are present; no two criteria contradict each other.
 
-**Approval A1, scope:** show the user the scope of this iteration, what is left in the backlog and the open questions with a recommendation for each. Record the decision and the answers in the state file.
+**Sprint planning:** run `ready --stories <proposed IDs>` and send any failures back to the product-manager. Plan the sprint as the card-tracking skill describes: capacity, priority order, dependencies.
 
-**Cards:** with a tracker set up, run `push --dry-run` the first time and show the user a sample, then `push`, then move the stories and items in scope to ready.
+**Approval A1, scope:** show the user the sprint goal, dates and capacity, the stories with their points and total, the scope of this iteration, what is left in the backlog and the open questions with a recommendation for each. Record the decision and the answers in the state file.
+
+**Cards:** with a tracker set up, run `push --dry-run` the first time and show the user a sample, then `push`, then `sprint start`, then move the stories and items in scope to ready.
+
+**At every approval gate:** if notifications are on, send the approval notification. If ClickUp approvals are on, also run `gate request`, and check `gate status` before you move on or when the user returns. A decision in chat or from a named approver ends the gate, as the card-tracking skill describes.
 
 ## 2. Design
 
@@ -132,7 +136,7 @@ Delegate to the devops-engineer: the pipeline, the hosting configuration, `docs/
 2. List what must carry forward: every open bug, every Not verified item, every deferred Should and Could, every minor review finding, and each improvement you identified from the handoff notes, the QA report, the review and the phase log.
 3. Delegate to the product-manager to add that list to `docs/requirements/backlog.md`, quoting it in full, and to mark this iteration's items Done. Each item gets an ID.
 4. Write this iteration's section of `docs/lifecycle/retrospective.md`, citing the backlog IDs the product-manager created.
-5. Run `push` so the new backlog items have cards. If the pull request is merged, move the iteration's cards to done; if not, leave them in ready_for_release and say so.
+5. Run `push` so the new backlog items have cards, then `sprint close`, and send the closed notification if notifications are on. If the pull request is merged, move the iteration's cards to done; if not, leave them in ready_for_release and say so.
 6. Close the iteration in the state file: outcome, date, the branch and pull request, and what carries forward.
 
 **Exit check:** the retrospective is written; nothing known is missing from the backlog; the state file shows the iteration closed.

@@ -94,8 +94,31 @@ export function createClient({ token, baseUrl, fetchImpl = globalThis.fetch, sle
     getTask: (taskId) => request("GET", `/task/${encodeURIComponent(taskId)}?include_markdown_description=true`),
     createTask: (listId, body) => request("POST", `/list/${encodeURIComponent(listId)}/task`, body),
     updateTask: (taskId, body) => request("PUT", `/task/${encodeURIComponent(taskId)}`, body),
-    addComment: (taskId, text) =>
-      request("POST", `/task/${encodeURIComponent(taskId)}/comment`, { comment_text: text, notify_all: false }),
+    // notifyAll alerts the task's watchers; used for approval requests, so approvers see them.
+    addComment: (taskId, text, { notifyAll = false } = {}) =>
+      request("POST", `/task/${encodeURIComponent(taskId)}/comment`, { comment_text: text, notify_all: notifyAll }),
+    getUser: () => request("GET", "/user"),
+    getTeams: () => request("GET", "/team"),
+    addTag: (taskId, tag) => request("POST", `/task/${encodeURIComponent(taskId)}/tag/${encodeURIComponent(tag)}`),
+    removeTag: (taskId, tag) => request("DELETE", `/task/${encodeURIComponent(taskId)}/tag/${encodeURIComponent(tag)}`),
+    listReplies: async (commentId) => {
+      const data = await request("GET", `/comment/${encodeURIComponent(commentId)}/reply`);
+      return Array.isArray(data.comments) ? data.comments : [];
+    },
+    // Comments come newest first, 25 at a time; older pages are asked for by the oldest comment seen.
+    async listComments(taskId) {
+      const comments = [];
+      let cursor = "";
+      for (let page = 0; page < 40; page += 1) {
+        const data = await request("GET", `/task/${encodeURIComponent(taskId)}/comment${cursor}`);
+        const batch = Array.isArray(data.comments) ? data.comments : [];
+        comments.push(...batch);
+        if (batch.length < 25) break;
+        const oldest = batch[batch.length - 1];
+        cursor = `?start=${encodeURIComponent(oldest.date)}&start_id=${encodeURIComponent(oldest.id)}`;
+      }
+      return comments;
+    },
     async listTasks(listId) {
       const tasks = [];
       for (let page = 0; page < 100; page += 1) {

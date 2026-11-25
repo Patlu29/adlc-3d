@@ -63,6 +63,7 @@ The plugin's hooks act on every file write inside a project that has `docs/proje
 |---|---|
 | Before a write | Blocks `.env` files that hold values (`.env`, `.env.local`, `.env.production`, `.env.*.local`), generated output (`dist/`, `node_modules/`, test reports), `package-lock.json`, `assets/source/`, agents writing `docs/project-status.md`, `docs/lifecycle/` or `docs/tracker/`, and new content that looks like a credential |
 | After a write | Warns when you edited a path another agent owns, and lists code-rules self-review hits in the file you changed |
+| Before a shell command | Blocks adding or removing ClickUp approvers, calling the ClickUp API directly, and reading the ClickUp token or a webhook URL |
 
 A block is not an error to work around. Do not try another tool, such as a shell command, to make the same write; follow the reason the hook gives, or report it under **Open questions**. A warning after a write needs action: undo an edit outside your paths, and fix or justify each code-rules hit.
 

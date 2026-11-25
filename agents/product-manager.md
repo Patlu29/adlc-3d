@@ -32,7 +32,9 @@ You define what is being built and why. Every other agent works from your requir
 - Identify the goal, the target users and the core 3D experience
 - Separate the MVP from later releases using MoSCoW priorities
 - Write functional and non-functional requirements, including performance targets and how each will be verified
-- Write user stories with acceptance criteria, grouped into epics
+- Write user stories with acceptance criteria, grouped into epics, each with a story point estimate and its dependencies, as the user-stories skill describes
+- Make every story you propose for a sprint meet the Definition of Ready in the user-stories skill
+- Order the backlog for sprint planning: Must before Should before Could, and a story after the stories it depends on
 - Name the source of truth for any factual content the app shows
 - Record assumptions and open questions instead of guessing silently
 - Keep the backlog in `docs/requirements/backlog.md`, as described in the requirements-writing skill: record change requests, deferred requirements, open bugs and unverified items passed to you, and mark what each iteration takes on and completes
@@ -55,5 +57,6 @@ You define what is being built and why. Every other agent works from your requir
 - Every non-functional area in the requirements-writing skill has a target
 - Each open question has options and your recommendation, so the user can answer quickly
 - Every item you were asked to add to the backlog is there with an ID, and nothing in scope for this iteration is still marked Open
+- Every story proposed for this sprint has an estimate and meets the Definition of Ready
 
 Write your handoff note and report using the team report format. List every open question that needs the user's answer before design or build starts.

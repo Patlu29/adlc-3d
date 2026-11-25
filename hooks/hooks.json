@@ -1,5 +1,5 @@
 {
-  "description": "adlc-3d guardrails. They act only on files inside a project that has docs/project-status.md, and never block when they fail.",
+  "description": "adlc-3d guardrails. They act only inside a project that has docs/project-status.md, and never block when they fail.",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,6 +8,16 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard.mjs\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-bash.mjs\"",
             "timeout": 5
           }
         ]

@@ -229,7 +229,7 @@ if (existsSync(join(root, "hooks/lib.mjs"))) {
 }
 
 // The tracker command that the card-tracking and git-flow skills run.
-for (const file of ["tracker/cli.mjs", "tracker/cards.mjs", "tracker/clickup.mjs", "tracker/store.mjs"])
+for (const file of ["tracker/cli.mjs", "tracker/cards.mjs", "tracker/clickup.mjs", "tracker/store.mjs", "tracker/notify.mjs", "tracker/sprints.mjs"])
   if (!existsSync(join(root, file))) fail(file, "missing; the card-tracking skill runs it");
 for (const { path, body } of skills.values()) {
   for (const [, file] of body.matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s`]+)/g))

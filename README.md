@@ -94,7 +94,7 @@ Each agent can also be used on its own for work in its area.
 - **Independent review.** The architect reviews the finished code against the contracts before you are asked to approve a release.
 - **A closed loop.** Open bugs, unverified items and lessons from each iteration go into the backlog instead of being forgotten.
 - **One owner per path.** Agents edit only their own folders and route everything else through handoff requests.
-- **Guardrail hooks.** Inside a project with `docs/project-status.md`, a hook blocks writes to `.env` files with values, generated output, `package-lock.json`, your `assets/source/` folder and the Tech Lead's lifecycle files, and blocks new content that looks like a credential. A second hook warns an agent that edits another agent's folder and lists code-rules hits in the file it changed. See [Guardrail hooks](#guardrail-hooks).
+- **Guardrail hooks.** Inside a project with `docs/project-status.md`, a hook stops shell commands that add ClickUp approvers, call the ClickUp API directly or read the token or a webhook URL. Another hook blocks writes to `.env` files with values, generated output, `package-lock.json`, your `assets/source/` folder and the Tech Lead's lifecycle files, and blocks new content that looks like a credential. A second hook warns an agent that edits another agent's folder and lists code-rules hits in the file it changed. See [Guardrail hooks](#guardrail-hooks).
 - **Security baseline.** The code rules map to the OWASP Top 10. The generated pipeline adds `npm audit` with expiring exceptions, a licence allow-list, a CycloneDX SBOM, a gitleaks secret scan, Dependabot and CodeQL, and hosting ships security headers with a content security policy that starts in report-only mode.
 - **Accessibility.** The default standard is WCAG 2.2 AA. The design spec covers the criteria 3D apps most often miss, such as alternatives to dragging, and QA scans each UI state with axe, listing the checks axe cannot do inside the canvas.
 - **Honest limits.** Frame rates from headless browsers, browsers that could not be launched and devices that were not tested are reported as unverified, not as passes.
@@ -106,7 +106,7 @@ From 3.2.0 the plugin ships two hooks that run on every Write and Edit while the
 - **They act only inside an ADLC project:** a folder whose root has `docs/project-status.md`. Your other projects are untouched. Before the Plan phase creates that file, nothing is guarded
 - **They never approve anything.** They can only block a write (before it) or add a warning (after it), so your own permission prompts still apply
 - **They fail open.** If Node is missing, the input is unexpected or a hook errors or takes more than 5 seconds, the write goes ahead
-- **They do not cover shell commands.** An agent could still write a file through Bash; the agents are told not to, and the pipeline's secret scan is the backstop
+- **They cover shell commands only for ClickUp.** A Bash hook blocks adding approvers, calling the ClickUp API directly and reading the token or webhook URLs. An agent could still write a file through Bash; the agents are told not to, and the pipeline's secret scan is the backstop
 
 To switch them off for one project, add a line `Hooks: off` to `docs/project-status.md`. To switch them off for a session, start Claude Code with `ADLC3D_HOOKS=off`.
 
@@ -136,6 +136,30 @@ A personal token acts with all of your rights in ClickUp, so consider a dedicate
 **If ClickUp is unavailable**, the operation is queued in `docs/tracker/remote.json` and retried by the next tracker command. The tracker never holds up a phase. If someone edits a card in ClickUp, the next push leaves it alone and asks you.
 
 Prefer to keep everything in the repository? Choose the local board: the same cards and states, in `docs/tracker/board.md`.
+
+## Sprints, notifications and approvals
+
+From 4.1.0 each iteration is a sprint:
+
+- **Estimates.** The product-manager sizes every story in points (1, 2, 3, 5 or 8) in its heading, `### US-1: Rotate the model (FR-5, Must, 3 pts)`, and the architect reviews the estimates against the design
+- **Definition of Ready.** A story enters a sprint only with a requirement, a priority, at least two testable criteria, an estimate and its dependencies in place. `ready` checks it before approval A1
+- **Sprint planning.** The Tech Lead fills the sprint in priority order up to the capacity you give, or your velocity from earlier sprints, and shows the plan at approval A1. An iteration card `IT-<n>` in ClickUp holds the goal, dates and cards; each card is tagged `sprint-<n>` with the end date
+- **Sprint report.** `docs/tracker/sprint-<n>.md` shows points committed and completed, scope changes, re-estimates and a daily burndown. `sprint close` records velocity for the next plan
+
+**Notifications.** If you choose them, the Tech Lead posts to Slack, Teams or both when a gate is waiting for you, when something is blocked, when a release is approved and when an iteration closes. Set the webhook URLs in your own shell profile:
+
+```bash
+export SLACK_WEBHOOK_URL=<Slack incoming webhook URL>
+export TEAMS_WEBHOOK_URL=<Teams Workflows webhook URL>
+```
+
+Only Slack incoming webhooks (`hooks.slack.com`) and Teams Workflows hosts are accepted, and a failed notification never stops the work.
+
+**Approvals in ClickUp.** You approve in chat by default. If you switch ClickUp approvals on, named approvers can also answer a gate on the iteration card with a comment that starts `Approve A1` or `Reject A1: <reason>`:
+
+- You add approvers yourself, in your own terminal: `node <plugin folder>/tracker/cli.mjs approvers add <username>`. A hook stops Claude and the agents running it
+- The person whose token the tracker uses cannot be an approver, because the tracker posts as them. Use a dedicated ClickUp user for the token if you want to approve in ClickUp yourself
+- Approval with changes, a decision on work that changed after the request, and disagreeing approvers all come back to you in chat. Exceptions, pushes, merges and deploys are always chat only
 
 ## Branches and pull requests
 
