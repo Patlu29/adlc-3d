@@ -2,6 +2,14 @@
 
 All notable changes to this plugin. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the plugin uses [semantic versioning](https://semver.org/). Release notes with upgrade steps are on the [releases page](https://github.com/Patlu29/adlc-3d/releases).
 
+## [4.0.1] - 2026-11-25
+
+### Fixed
+- Agent sub-tasks in ClickUp were named `[US-1/scene-developer] undefined`. They are now named after their agent and story, such as `[US-1/scene-developer] scene-developer: Rotate the model`. Run `task` again for an existing sub-task to rename it in place
+
+### Verified
+- The tracker was run against a live ClickUp List: init and status mapping, dry run, push, move with notes, agent sub-tasks, criteria results (shown as checkboxes in the markdown description), comments, an update without a false conflict, a repeat push that changes nothing, and the drift report
+
 ## [4.0.0] - 2026-11-25
 
 Major release: the Build and Review gates gain a code review, and the Tech Lead now asks about a tracker and commits at the start of every project, including iterations already in progress.
