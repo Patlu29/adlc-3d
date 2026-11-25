@@ -1,6 +1,6 @@
 # ADLC 3D
 
-A Claude Code plugin that builds 3D web applications with a team of specialist agents, run as an Agentic Development Life Cycle (ADLC). A Tech Lead takes an idea through seven phases, with your approval of the scope, the design and the release, an evidence check on every phase, and a feedback loop that turns what was learned into the next iteration.
+A Claude Code plugin that builds 3D web applications with a team of specialist agents, run as an Agentic Development Life Cycle (ADLC). A Tech Lead takes an idea through seven phases, with your approval of the scope, the design and the release, an evidence check on every phase, and a feedback loop that turns what was learned into the next iteration. Every story, backlog item, bug and agent task can be tracked as a card in ClickUp or on a local board, and each iteration lives on its own branch with one pull request.
 
 The default stack is Vite, React, TypeScript, React Three Fiber, drei and zustand, tested with Vitest and Playwright.
 
@@ -44,13 +44,15 @@ The Tech Lead checks your environment, agrees the project folder, then runs the 
 |---|---|---|---|
 | 1 | Plan | Requirements, user stories and the backlog | **You approve the scope** |
 | 2 | Design | Architecture, contracts between agents, scaffold, then the interface and 3D interaction design | **You approve the design** |
-| 3 | Build | Scene, assets, interface and any backend built in parallel, integrated and smoke tested | Automatic, on passing checks |
+| 3 | Build | Scene, assets, interface and any backend built in parallel, integrated, code reviewed and smoke tested | Automatic, on passing checks and no open critical or major review finding |
 | 4 | Verify | Performance measured and improved; every acceptance criterion tested; bugs fixed and re-tested | Automatic, on test evidence |
-| 5 | Review | Architect's release review, traceability matrix and a one-page release readiness report | **You approve the release** |
+| 5 | Review | Architect's release review, a code review of late changes, traceability matrix and a one-page release readiness report | **You approve the release** |
 | 6 | Release | Pipeline, hosting config, deployment notes and changelog. Nothing is deployed or pushed without your separate approval | Automatic |
 | 7 | Operate and learn | Retrospective, and every known gap recorded in the backlog | Automatic |
 
 If you want to approve every phase, or none, say so when you start; the default is the three key gates.
+
+At the start, the Tech Lead also asks which tracker to use and whether it may commit at phase exits. See [Cards and ClickUp](#cards-and-clickup) and [Branches and pull requests](#branches-and-pull-requests).
 
 ### Commands
 
@@ -76,6 +78,7 @@ The lifecycle state is kept in `docs/project-status.md`, so a new session picks 
 | performance-optimiser | Measurement and optimisation |
 | qa-engineer | End-to-end, visual regression and cross-browser tests |
 | devops-engineer | Pipeline and hosting configuration |
+| code-reviewer | Reviews every change line by line before it is tested; never edits code |
 
 Each agent can also be used on its own for work in its area.
 
@@ -87,6 +90,7 @@ Each agent can also be used on its own for work in its area.
 - **Contracts first.** The store shape, the test hook and the asset names are agreed in `docs/architecture.md` before agents build in parallel.
 - **Gates.** Every phase has exit criteria. The Tech Lead re-runs lint, type check, tests and build after every delegation, and does not start Verify on an app that does not load.
 - **Traceability.** Before release, each requirement is traced to its story, design reference, test and result, and every gap on a Must requirement is put in front of you.
+- **Code review on every change.** The code-reviewer reads the iteration's diff against the code rules, the contracts and the acceptance criteria before QA tests it, and again for anything changed later. Critical and major findings must be fixed before the build moves on.
 - **Independent review.** The architect reviews the finished code against the contracts before you are asked to approve a release.
 - **A closed loop.** Open bugs, unverified items and lessons from each iteration go into the backlog instead of being forgotten.
 - **One owner per path.** Agents edit only their own folders and route everything else through handoff requests.
@@ -106,6 +110,43 @@ From 3.2.0 the plugin ships two hooks that run on every Write and Edit while the
 
 To switch them off for one project, add a line `Hooks: off` to `docs/project-status.md`. To switch them off for a session, start Claude Code with `ADLC3D_HOOKS=off`.
 
+## Cards and ClickUp
+
+From 4.0.0 the Tech Lead can keep the work as cards, so people around the project can follow it without reading `docs/`:
+
+| Card | From | In ClickUp |
+|---|---|---|
+| Story `US-3` | `docs/requirements/user-stories.md` | A task tagged `adlc-story` and `epic-e1`, with the acceptance criteria listed in the description and ticked off as QA results come in |
+| Backlog item `CR-4` | `docs/requirements/backlog.md` | A task tagged `adlc-change` or `adlc-bug` |
+| Bug `BUG-2` | `docs/qa-report.md` | A task tagged `adlc-bug`, with priority from its severity |
+| Agent task `US-3/scene-developer` | Each build delegation | A sub-task of its story |
+
+Cards move through backlog, ready, in progress, in review, in test, ready for release and done as the phases run, with a note at each step. Several of these can map to one ClickUp status, so a List with the default three statuses works.
+
+**Setting it up.** Choose ClickUp when the Tech Lead asks, and give it the List ID (the number in the List's URL). Then set a token in your own shell, never in chat or a file:
+
+```bash
+export CLICKUP_API_TOKEN=<token from ClickUp Settings > Apps>
+```
+
+A personal token acts with all of your rights in ClickUp, so consider a dedicated ClickUp user with access to that one List. For plan or licence questions, contact the Sales team.
+
+**What leaves your machine.** In `full` mode, card titles, story text, acceptance criteria, bug details and short evidence notes are sent to ClickUp. In `minimal` mode only titles, IDs, the stories a bug breaks and short status notes (280 characters at most) are sent; story text, criteria wording and files stay in the repository. You see a dry run before the first push. Content that looks like a credential is never sent.
+
+**If ClickUp is unavailable**, the operation is queued in `docs/tracker/remote.json` and retried by the next tracker command. The tracker never holds up a phase. If someone edits a card in ClickUp, the next push leaves it alone and asks you.
+
+Prefer to keep everything in the repository? Choose the local board: the same cards and states, in `docs/tracker/board.md`.
+
+## Branches and pull requests
+
+If you agree to commits at the start, the Tech Lead:
+
+1. Creates one branch per iteration, named after its main card, such as `feat/CU-86abc12-share-view-link`. The ClickUp GitHub integration links branches, commits and pull requests that carry a card key.
+2. Commits at each phase exit, staging only the files that phase produced, after a scan of the staged changes for credentials.
+3. At the release approval, asks separately whether to push the branch and open a pull request.
+
+Agents never commit, push or merge. You, or your team's review process, merge the pull request; the cards move to done once it is merged.
+
 ## What the build produces
 
 Alongside the application code, each project gets:
@@ -117,7 +158,8 @@ Alongside the application code, each project gets:
 | `docs/architecture.md`, `docs/decisions/` | Architecture, contracts and decision records |
 | `docs/design-spec.md` | Design specification |
 | `docs/performance.md`, `docs/qa-report.md` | Measurements and test results |
-| `docs/review.md` | The architect's release review |
+| `docs/review.md`, `docs/code-review.md` | The architect's release review and the code review of each iteration |
+| `docs/tracker/` | Tracker settings, the card registry and `board.md`, if you chose a tracker |
 | `docs/lifecycle/` | Traceability matrix, release readiness report, retrospective |
 | `docs/deployment.md`, `CHANGELOG.md` | Hosting, pipeline, manual steps and release history |
 | `docs/handoffs/` | Each agent's latest handoff note |
@@ -129,8 +171,9 @@ Alongside the application code, each project gets:
 agents/           one file per agent
 skills/           one folder per skill; build, change and status are the commands,
                   and lifecycle is the rulebook they load
-hooks/            hooks.json, the guard and review hooks, and their shared ownership map
-scripts/          validate-plugin.mjs and test-hooks.mjs
+hooks/            hooks.json, the guard and review hooks, and their shared ownership map and secret patterns
+tracker/          the tracker command: ClickUp client, document parser, card registry and board
+scripts/          validate-plugin.mjs, test-hooks.mjs and test-tracker.mjs
 ```
 
 After any change, run the validator and the hook tests. The validator checks frontmatter, that every skill an agent preloads exists, that references to agents and skills resolve, that the lifecycle names every phase and agent, that the hooks point at real scripts and agents, that the governance files exist, and that the manifest versions and changelog match:
@@ -142,6 +185,12 @@ node scripts/validate-plugin.mjs
 ```bash
 node scripts/test-hooks.mjs
 ```
+
+```bash
+node scripts/test-tracker.mjs
+```
+
+The tracker tests run the command against a mock of the ClickUp API, so they need no ClickUp account.
 
 See `CONTRIBUTING.md` for the branch, versioning and release process, and `SECURITY.md` to report a vulnerability. The plugin is proprietary; see `LICENSE`.
 

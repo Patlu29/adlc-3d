@@ -68,7 +68,7 @@ Separate application defects from environment problems. A browser that will not 
 ## 6. Stay safe in the user's environment
 
 - Never change global configuration (`npm config`, `git config`, shell profiles) or install global tools
-- Never commit, push, deploy or create cloud resources unless the task prompt says the user approved it
+- Never commit, push, deploy or create cloud resources unless the task prompt says the user approved it. In this team the Tech Lead commits, under the git-flow rules the user agreed to; agents do not
 - Never write a secret value into any file
 - Never delete or overwrite files you did not create, except files you own that the task tells you to replace
 - Never run a command that waits for input. Pass non-interactive flags, and stop any server or watcher you start before you finish

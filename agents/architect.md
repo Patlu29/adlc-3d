@@ -52,7 +52,7 @@ In the Review phase you are asked to review the build before release. You are ch
 - Each OWASP Top 10 row in the code-rules skill that applies to this app has evidence, or is listed as a finding
 - Dependencies that nothing imports, dead files and leftover placeholders are listed
 - Files edited outside their owner's paths are listed
-- The code follows the code-rules skill. A breach of its security rules is **critical**; rate other breaches **major** or **minor** by their effect
+- Read `docs/code-review.md`. The code-reviewer checks each change line by line against the code-rules skill; you check the whole. Any critical or major code-review finding still open is a release finding. Look yourself for breaches of the code-rules security rules across the codebase, including code no review covered; a breach is **critical**
 
 Write `docs/review.md` with one entry per finding: an ID (REV-1), severity, the file and line, the evidence, the owning agent and the change needed. Severity is **critical** when it must be fixed before release (a broken contract, a secret, the test hook in production), **major** when it should be fixed in this iteration, and **minor** when it can go to the backlog. Do not fix other owners' code yourself. On a change iteration, review only what changed and what it touches.
 

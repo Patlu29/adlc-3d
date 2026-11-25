@@ -123,11 +123,24 @@ expectGuard("project-status by a short agent name is blocked", write(project, "d
 expectGuard("lifecycle docs by an agent are blocked", write(project, "docs/lifecycle/traceability.md", "x", architect), true);
 expectGuard("project-status by the Tech Lead is allowed", write(project, "docs/project-status.md"), false);
 expectGuard("lifecycle docs by the Tech Lead are allowed", write(project, "docs/lifecycle/retrospective.md"), false);
+expectGuard("tracker files by an agent are blocked", write(project, "docs/tracker/board.md", "x", { agent_type: "adlc-3d:code-reviewer" }), true);
 
 // Secrets in new content
 expectGuard("AWS key is blocked", write(project, "src/config.ts", `const k = "${FAKE.aws}";`), true);
 expectGuard("AWS documentation example is allowed", write(project, "docs/deployment.md", FAKE.awsExample), false);
 expectGuard("GitHub token is blocked", write(project, "docs/deployment.md", FAKE.github), true);
+expectGuard("ClickUp token is blocked", write(project, "docs/deployment.md", `CLICKUP_API_TOKEN=${["pk", "8812345", "Q".repeat(32)].join("_")}`), true);
+expectGuard("Google API key is blocked", write(project, "src/maps.ts", `const k = "${"AIza" + "S".repeat(35)}";`), true);
+expectGuard("npm token is blocked", write(project, ".npmrc", `//registry.npmjs.org/:_authToken=${"npm_" + "x".repeat(36)}`), true);
+expectGuard("JSON Web Token is blocked", write(project, "tests/e2e/auth.spec.ts", `const t = "${["eyJ" + "a".repeat(20), "eyJ" + "b".repeat(20), "c".repeat(30)].join(".")}";`), true);
+expectGuard("hard-coded password is blocked", write(project, "server/db.ts", `const config = { password: "${"Tr0ub4dor" + "&3x"}" };`), true);
+expectGuard("DB_PASSWORD assignment is blocked", write(project, "docker-compose.yml", `DB_PASSWORD="${"Tr0ub4dor" + "&3x"}"`), true);
+expectGuard("JSON password key is blocked", write(project, "server/seed.json", `{ "password": "${"Tr0ub4dor" + "&3x"}" }`), true);
+expectGuard("seeded test login under tests/ is allowed", write(project, "tests/e2e/login.spec.ts", 'await page.fill("#pw", "x"); const user = { password: "TestPass123!" };'), false);
+expectGuard("a working-directory path is allowed", write(project, "scripts/run.ts", 'const opts = { pwd: "/workspace/app" };'), false);
+expectGuard("password placeholder is allowed", write(project, "docs/deployment.md", 'Set `password: "<from the secret store>"` in the host settings.'), false);
+expectGuard("password read from the environment is allowed", write(project, "server/db.ts", "const password = process.env.DB_PASSWORD;"), false);
+expectGuard("ClickUp token variable name alone is allowed", write(project, "docs/deployment.md", "Set CLICKUP_API_TOKEN in your shell."), false);
 expectGuard("Stripe secret key is blocked", write(project, "server/pay.ts", FAKE.stripeSecret), true);
 expectGuard("Stripe publishable key is allowed", write(project, "src/pay.ts", FAKE.stripePublic), false);
 expectGuard("private key in src is blocked", write(project, "src/key.ts", FAKE.pem), true);
@@ -156,6 +169,8 @@ expectReview("another agent's path gets a warning", edit(project, "src/scene/Cam
 expectReview("short agent name is recognised", edit(project, "src/scene/Camera.ts", "frontend-developer"), [["owned by scene-developer", true]]);
 expectReview("the Tech Lead gets no ownership warning", edit(project, "src/scene/Camera.ts"), [["owned by", false]]);
 expectReview("performance-optimiser exception", edit(project, "src/scene/Camera.ts", "adlc-3d:performance-optimiser"), [["owned by", false]]);
+expectReview("code-reviewer writing its review gets no warning", edit(project, "docs/code-review.md", "adlc-3d:code-reviewer"), [["owned by", false]]);
+expectReview("code-reviewer editing source gets a warning", edit(project, "src/scene/Camera.ts", "adlc-3d:code-reviewer"), [["owned by scene-developer", true]]);
 expectReview("own handoff note gets no warning", edit(project, "docs/handoffs/qa-engineer.md", "adlc-3d:qa-engineer"), [["owned by", false]]);
 expectReview("another agent's handoff note gets a warning", edit(project, "docs/handoffs/qa-engineer.md", "adlc-3d:architect"), [["owned by qa-engineer", true]]);
 expectReview("an agent from another plugin is ignored", edit(project, "src/ui/Panel.tsx", "other-plugin:helper"), [["adlc-3d review", false]]);

@@ -228,6 +228,14 @@ if (existsSync(join(root, "hooks/lib.mjs"))) {
   }
 }
 
+// The tracker command that the card-tracking and git-flow skills run.
+for (const file of ["tracker/cli.mjs", "tracker/cards.mjs", "tracker/clickup.mjs", "tracker/store.mjs"])
+  if (!existsSync(join(root, file))) fail(file, "missing; the card-tracking skill runs it");
+for (const { path, body } of skills.values()) {
+  for (const [, file] of body.matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s`]+)/g))
+    if (!existsSync(join(root, file))) fail(path, `runs \${CLAUDE_PLUGIN_ROOT}/${file}, which does not exist`);
+}
+
 // Governance files a corporate review expects.
 for (const file of ["LICENSE", "SECURITY.md", "CONTRIBUTING.md", "CHANGELOG.md", ".github/CODEOWNERS"])
   if (!existsSync(join(root, file))) fail(file, "missing");

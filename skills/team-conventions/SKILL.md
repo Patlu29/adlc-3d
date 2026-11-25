@@ -16,9 +16,9 @@ The team works in the Agentic Development Life Cycle. Work moves through seven p
 |---|---|---|---|
 | 1 | Plan | product-manager | The user approves the scope |
 | 2 | Design | architect, ux-ui-designer | The user approves the design |
-| 3 | Build | technical-artist, scene-developer, frontend-developer, backend-developer, qa-engineer for the smoke test | Checks and the smoke test pass |
+| 3 | Build | technical-artist, scene-developer, frontend-developer, backend-developer, code-reviewer, qa-engineer for the smoke test | Checks pass, no critical or major code-review finding is open, and the smoke test passes |
 | 4 | Verify | performance-optimiser, qa-engineer | Every criterion in scope has a result |
-| 5 | Review | architect, the Tech Lead | The user approves the release |
+| 5 | Review | architect, code-reviewer for late changes, the Tech Lead | The user approves the release |
 | 6 | Release | devops-engineer | The pipeline and hosting config are ready |
 | 7 | Operate and learn | the Tech Lead, product-manager, qa-engineer if deployed | The retrospective and backlog are updated |
 
@@ -28,6 +28,8 @@ What this means for you:
 - Work only within the scope of the current iteration. Anything else you notice goes under **Open questions** or **Requests for other agents**, so it can reach the backlog
 - If you find that an artefact from an earlier phase is wrong, do not work around it. Report it so the owner can correct it in that phase
 - You may be called again in a later iteration. Your handoff note is how you will know what you did and why
+- Your task prompt names the **Cards** you are working on, such as `US-7 (CU-86abc12)`. Use the IDs in your handoff note and report, so the Tech Lead can update the cards. You never update the tracker yourself
+- Never run git commands that change the repository (commit, branch, checkout, stash, reset, push). The Tech Lead commits at each phase exit. Read-only commands such as `git diff` and `git log` are fine
 
 ## Folder ownership
 
@@ -42,10 +44,11 @@ What this means for you:
 | `server/`, `docs/api.md` | backend-developer |
 | `docs/performance.md` | performance-optimiser |
 | `tests/e2e/`, `playwright.config.ts`, `docs/qa-report.md` | qa-engineer |
+| `docs/code-review.md` | code-reviewer |
 | `tests/unit/<area>/` | The developer who owns the code under test |
 | `.github/`, `infra/`, hosting config (such as `netlify.toml`, `vercel.json`, `public/_headers` and `public/_redirects`), `docs/deployment.md`, `CHANGELOG.md` | devops-engineer |
 | `docs/handoffs/<agent-name>.md` | That agent |
-| `docs/project-status.md`, `docs/lifecycle/` | The Tech Lead. Read only for every agent |
+| `docs/project-status.md`, `docs/lifecycle/`, `docs/tracker/` | The Tech Lead. Read only for every agent; `docs/tracker/` is written only by the tracker command |
 | `assets/source/` | The user. Read only for every agent |
 
 Only edit paths you own. If a path you don't own needs a change, describe the change under **Requests for other agents** in your handoff note and name the owner. The performance-optimiser has a documented exception for optimisation changes.
@@ -58,7 +61,7 @@ The plugin's hooks act on every file write inside a project that has `docs/proje
 
 | Hook | What it does |
 |---|---|
-| Before a write | Blocks `.env` files that hold values (`.env`, `.env.local`, `.env.production`, `.env.*.local`), generated output (`dist/`, `node_modules/`, test reports), `package-lock.json`, `assets/source/`, agents writing `docs/project-status.md` or `docs/lifecycle/`, and new content that looks like a credential |
+| Before a write | Blocks `.env` files that hold values (`.env`, `.env.local`, `.env.production`, `.env.*.local`), generated output (`dist/`, `node_modules/`, test reports), `package-lock.json`, `assets/source/`, agents writing `docs/project-status.md`, `docs/lifecycle/` or `docs/tracker/`, and new content that looks like a credential |
 | After a write | Warns when you edited a path another agent owns, and lists code-rules self-review hits in the file you changed |
 
 A block is not an error to work around. Do not try another tool, such as a shell command, to make the same write; follow the reason the hook gives, or report it under **Open questions**. A warning after a write needs action: undo an edit outside your paths, and fix or justify each code-rules hit.
@@ -81,6 +84,8 @@ Read the documents your task depends on before you start. Do not rely on memory 
 | `docs/design-spec.md` | Layout, tokens, interactions, accessibility |
 | `docs/api.md` | Backend API contract |
 | `docs/review.md` | The architect's release review findings |
+| `docs/code-review.md` | The code reviewer's findings on this iteration's changes |
+| `docs/tracker/board.md` | The cards and their states, if a tracker is set up |
 | `docs/lifecycle/` | Traceability matrix, release readiness report and retrospective |
 | `docs/handoffs/<agent-name>.md` | Each agent's latest handoff note |
 
@@ -133,7 +138,7 @@ When you finish, write `docs/handoffs/<your-agent-name>.md`. If the file exists,
 ```markdown
 # Handoff: <agent-name>
 
-Iteration: <number and scope>. Phase: <number and name>.
+Iteration: <number and scope>. Phase: <number and name>. Cards: <IDs and keys>.
 
 ## Summary
 <two or three sentences on what you did>
