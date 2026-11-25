@@ -14,6 +14,7 @@ export const STATUS_FILE = join("docs", "project-status.md");
 export const AGENTS = [
   "architect",
   "backend-developer",
+  "code-reviewer",
   "devops-engineer",
   "frontend-developer",
   "performance-optimiser",
@@ -60,6 +61,7 @@ export const OWNERSHIP = [
   ["tests/e2e/", ["qa-engineer"]],
   ["playwright.config.ts", ["qa-engineer"]],
   ["docs/qa-report.md", ["qa-engineer"]],
+  ["docs/code-review.md", ["code-reviewer"]],
   ["tests/unit/", CODE_AUTHORS],
   [".github/", ["devops-engineer"]],
   ["infra/", ["devops-engineer"]],
@@ -70,6 +72,40 @@ export const OWNERSHIP = [
   ["docs/deployment.md", ["devops-engineer"]],
   ["CHANGELOG.md", ["devops-engineer"]],
 ];
+
+// .env files that hold real values. .env.example, .env.development and .env.test stay editable,
+// because Vite uses them for non-secret build settings.
+export const SECRET_ENV = /(^|\/)\.env(\.local|\.production|\.[\w-]+\.local)?$/;
+
+// Credentials that must never be written into a project or sent to the tracker.
+// Each entry: label, pattern (global), optional filter for known example values.
+export const SECRET_PATTERNS = [
+  ["an AWS access key", /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g, (m) => m !== "AKIAIOSFODNN7EXAMPLE"],
+  // The header alone is allowed, so documentation can name the format; key data after it is not.
+  ["a private key", /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----\s*(?:[\w-]+:[^\n]*\s*)*[A-Za-z0-9+/=]{40,}/g],
+  ["a GitHub token", /\b(?:gh[pousr]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{50,})\b/g],
+  ["a Slack token", /\bxox[abprs]-[A-Za-z0-9-]{10,}/g],
+  ["a Stripe secret key", /\b(?:sk|rk)_live_[A-Za-z0-9]{16,}/g],
+  ["an Anthropic API key", /\bsk-ant-[A-Za-z0-9_-]{20,}/g],
+  ["an OpenAI API key", /\bsk-proj-[A-Za-z0-9_-]{20,}/g],
+  ["a ClickUp API token", /\bpk_\d{3,}_[A-Z0-9]{32}\b/g],
+  ["a Google API key", /\bAIza[0-9A-Za-z_-]{35}\b/g],
+  ["an npm token", /\bnpm_[A-Za-z0-9]{36}\b/g],
+  ["a JSON Web Token", /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g],
+  // A literal password in code or config, including DB_PASSWORD= and "password": forms.
+  // Placeholders such as "<password>" or "${PASSWORD}" are allowed, and so are seeded test logins under tests/.
+  ["a hard-coded password", /(?<![A-Za-z0-9])["']?[A-Za-z_]*(?:password|passwd)["']?\s*[:=]\s*["'](?![<$%{*]|changeme|example|password)[^"'\s]{8,}["']/gi, undefined, /^tests\//],
+];
+
+// Returns the label of the first credential found in text, or null. rel is the file's path from
+// the project root, when there is one, so a pattern can exempt paths such as tests/.
+export function findSecret(text, rel = "") {
+  for (const [label, pattern, keep = () => true, exempt = null] of SECRET_PATTERNS) {
+    if (exempt && rel && exempt.test(rel)) continue;
+    if ((String(text).match(pattern) || []).filter(keep).length) return label;
+  }
+  return null;
+}
 
 // Root config files whose names vary by tool.
 const ARCHITECT_CONFIG = /^(vite\.config\.[cm]?[jt]s|vitest\.config\.[cm]?[jt]s|tsconfig(\.[\w-]+)?\.json|eslint\.config\.[cm]?[jt]s|\.eslintrc(\.[\w]+)?|\.prettierrc(\.[\w]+)?|prettier\.config\.[cm]?[jt]s|\.prettierignore)$/;

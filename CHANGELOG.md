@@ -2,6 +2,30 @@
 
 All notable changes to this plugin. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the plugin uses [semantic versioning](https://semver.org/). Release notes with upgrade steps are on the [releases page](https://github.com/Patlu29/adlc-3d/releases).
 
+## [4.0.0] - 2026-11-25
+
+Major release: the Build and Review gates gain a code review, and the Tech Lead now asks about a tracker and commits at the start of every project, including iterations already in progress.
+
+### Added
+- **Cards.** Every story, backlog item, QA bug and agent task can be a card in ClickUp or on a local board (`docs/tracker/board.md`), moved through backlog, ready, in progress, in review, in test, ready for release and done as the phases run. The new `card-tracking` skill covers setup, the user's consent and what each phase does
+- **Tracker command** `tracker/cli.mjs` (Node 18 or later, no dependencies): `init`, `check`, `push`, `move`, `task`, `comment`, `criteria`, `board` and `secrets`. It creates cards idempotently (a card lost from the registry, or created by a request whose response was lost, is found by its `[ID]` name rather than created twice), saves after every call, queues operations in order when ClickUp is unavailable and retries them on the next run, drops a queued operation that can never succeed, carries on past a card ClickUp rejects or deleted, never overwrites a card someone edited in ClickUp without `--force`, waits out rate limits, times out hung requests, and refuses content that looks like a credential
+- **Content modes** for ClickUp: `full`, or `minimal` (titles, IDs, the stories a bug breaks and short notes), shown to the user as a dry run before the first push. The token is read only from `CLICKUP_API_TOKEN` in the user's shell
+- **Git flow.** The new `git-flow` skill: with the user's consent, one branch per iteration named after its main card (`feat/CU-86abc12-share-view-link`), a commit at each phase exit staging only named paths after a credential scan of the staged changes, and a pull request only on the user's separate approval at A3. Agents never commit, push or merge
+- **code-reviewer agent.** Reviews the iteration's diff against the code rules, the contracts and the acceptance criteria at the end of Build, and again in Review for code changed later, writing `docs/code-review.md` with findings CODE-n
+- `/adlc-3d:status` reports open code-review findings, cards by state, drift from ClickUp (read only) and whether the pull request is merged
+- The guard hook blocks agent writes to `docs/tracker/`, and its credential patterns (shared with the tracker) add ClickUp, Google and npm tokens, JSON Web Tokens and hard-coded passwords
+- `scripts/test-tracker.mjs`: 78 checks against a mock ClickUp API and the local provider, run in CI. The hook tests grow to 69 checks
+
+### Changed
+- Build exits only when no critical or major code-review finding is open; Review exits only when the code review covers the last code change
+- The architect's release review relies on the code review for line-by-line checks and keeps the security, contract and supply-chain checks across the codebase
+- The state file gains `Tracker:`, `Git:`, `Branch:` and `Base:` lines, and delegation prompts and handoff notes name their cards
+- `/adlc-3d:change` offers to set up a tracker on projects that predate cards, and moves the last iteration's cards to done once its pull request is merged
+
+### Upgrading
+- Existing projects keep working: a state file without a `Tracker:` line means no tracker, and the Tech Lead asks before committing anything
+- To use ClickUp, have the List ID ready and set `CLICKUP_API_TOKEN` in your shell before running `/adlc-3d:change`
+
 ## [3.2.0] - 2026-11-18
 
 ### Added

@@ -2,7 +2,7 @@
 // Denies writes the team's rules forbid outright. Ownership between agents is only a warning,
 // given after the edit by review.mjs.
 
-import { agentName, emit, failOpen, findProjectRoot, hooksDisabled, newText, readInput } from "./lib.mjs";
+import { SECRET_ENV, agentName, emit, failOpen, findProjectRoot, findSecret, hooksDisabled, newText, readInput } from "./lib.mjs";
 
 // Paths relative to the project root. Generated or user-owned, so never hand-edited.
 const BLOCKED_PATHS = [
@@ -11,23 +11,9 @@ const BLOCKED_PATHS = [
   [/^assets\/source\//, "belongs to the user and is read only for every agent. Put processed assets under public/"],
 ];
 
-// .env files that hold real values. .env.example, .env.development and .env.test stay editable,
-// because Vite uses them for non-secret build settings.
-const SECRET_ENV = /(^|\/)\.env(\.local|\.production|\.[\w-]+\.local)?$/;
 
 // Read only for every agent; only the Tech Lead (the main thread) writes these.
-const TECH_LEAD_ONLY = /^docs\/(project-status\.md$|lifecycle\/)/;
-
-const SECRET_PATTERNS = [
-  ["an AWS access key", /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g, (m) => m !== "AKIAIOSFODNN7EXAMPLE"],
-  // The header alone is allowed, so documentation can name the format; key data after it is not.
-  ["a private key", /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----\s*(?:[\w-]+:[^\n]*\s*)*[A-Za-z0-9+/=]{40,}/g],
-  ["a GitHub token", /\b(?:gh[pousr]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{50,})\b/g],
-  ["a Slack token", /\bxox[abprs]-[A-Za-z0-9-]{10,}/g],
-  ["a Stripe secret key", /\b(?:sk|rk)_live_[A-Za-z0-9]{16,}/g],
-  ["an Anthropic API key", /\bsk-ant-[A-Za-z0-9_-]{20,}/g],
-  ["an OpenAI API key", /\bsk-proj-[A-Za-z0-9_-]{20,}/g],
-];
+const TECH_LEAD_ONLY = /^docs\/(project-status\.md$|lifecycle\/|tracker\/)/;
 
 // Test fixtures may hold throwaway keys, such as a PEM used to test an upload parser.
 const FIXTURES = /^tests\/(?:.+\/)?fixtures\//;
@@ -55,11 +41,9 @@ export function check(input) {
 
   if (!FIXTURES.test(rel)) {
     const text = newText(toolInput);
-    for (const [label, pattern, keep = () => true] of SECRET_PATTERNS) {
-      const hits = (text.match(pattern) || []).filter(keep);
-      if (hits.length)
-        return `the new content for ${rel} contains what looks like ${label}. Never write credentials into the project: read them from the environment and list the variable name in .env.example. If this is a false positive, use an obviously fake value.`;
-    }
+    const label = findSecret(text, rel);
+    if (label)
+      return `the new content for ${rel} contains what looks like ${label}. Never write credentials into the project: read them from the environment and list the variable name in .env.example. If this is a false positive, use an obviously fake value.`;
   }
   return null;
 }

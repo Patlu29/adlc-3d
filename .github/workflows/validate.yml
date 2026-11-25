@@ -19,3 +19,4 @@ jobs:
           node-version: lts/*
       - run: node scripts/validate-plugin.mjs
       - run: node scripts/test-hooks.mjs
+      - run: node scripts/test-tracker.mjs

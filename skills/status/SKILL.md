@@ -18,8 +18,17 @@ Read whichever of these exist:
 4. `docs/review.md`: open findings by severity
 5. `docs/lifecycle/release-readiness.md` and `docs/lifecycle/traceability.md`
 6. `docs/requirements/backlog.md`: open items by priority
+7. `docs/tracker/board.md`: cards by state, if the state file has a `Tracker:` line other than none
+8. `docs/code-review.md`: open code-review findings by severity
 
 If `docs/project-status.md` does not exist, say that no lifecycle has been started in this folder and that `/adlc-3d:build` starts one. Then stop.
+
+These read-only commands are allowed, because they change nothing:
+
+- With ClickUp as the tracker: `node "${CLAUDE_PLUGIN_ROOT}/tracker/cli.mjs" board --remote`, to report cards that people moved, deleted or created in ClickUp. If it exits with 2, 3 or 4, report that the tracker could not be read (the output says why) and carry on
+- With a branch in the state file: `git status --short`, and `gh pr view <branch> --json state,mergedAt` if `gh` is installed, to report whether the pull request is open or merged. Never push, fetch into the working tree or change branches
+
+The card-tracking and git-flow skills (`adlc-3d:card-tracking`, `adlc-3d:git-flow`) explain what you find; load them if you need to.
 
 Check the record against the project instead of trusting it. If the state file says a phase is Done but its artefacts are missing or empty, report the mismatch. The phases, their artefacts and exit criteria are defined in the `adlc-3d:lifecycle` skill; load it if you need them.
 
@@ -39,6 +48,9 @@ Keep it short enough to read in a minute:
 **Waiting on you:** <open questions and approvals, or "nothing">
 **Open requests between agents:** <count, with owners>
 **Bugs open:** <count by severity>
+**Code review:** <open findings by severity, or "not run this iteration">
+**Cards:** <count by state, drift from the tracker, or "no tracker">
+**Branch:** <name, uncommitted changes, pull request open or merged, or "no git">
 **Not verified:** <items>
 **Backlog:** <count of open items, and the top three>
 **Next step:** <what happens next, and the command that does it>

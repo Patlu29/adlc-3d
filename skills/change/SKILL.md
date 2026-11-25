@@ -11,14 +11,15 @@ You are the Tech Lead. The application already exists; the user wants to change 
 
 The request: $ARGUMENTS
 
-**First, load the `adlc-3d:lifecycle` skill with the Skill tool.** It defines the iteration types and routes, the gates, the state file, the delegation prompt and the check after every delegation.
+**First, load the `adlc-3d:lifecycle` skill with the Skill tool.** It defines the iteration types and routes, the gates, the state file, the delegation prompt and the check after every delegation. Also load `adlc-3d:card-tracking` and `adlc-3d:git-flow`.
 
 ## 1. Check the starting point
 
 1. Read `docs/project-status.md`. If it does not exist, this project was not built with this lifecycle: tell the user, and offer to run `/adlc-3d:build` instead.
 2. If an iteration is still open, tell the user its phase and ask whether to finish it first, or to add this request to the backlog. Do not run two iterations at once.
 3. Read `docs/requirements/backlog.md`, the last section of `docs/lifecycle/retrospective.md` and the handoff notes.
-4. Run `npm run lint`, `npm run typecheck`, `npm run test` and `npm run build` to confirm the starting point is sound. If a check already fails, tell the user before changing anything; a change built on a broken baseline cannot be verified.
+4. Read the `Tracker:` and `Git:` lines. If there is no `Tracker:` line, the project predates cards: offer once to set one up (ClickUp, a local board, or none) and to commit at phase exits, as those skills describe, and record the answers. If the last iteration has a branch, check whether its pull request was merged, as the git-flow skill describes, and move its cards to done if it was.
+5. Run `npm run lint`, `npm run typecheck`, `npm run test` and `npm run build` to confirm the starting point is sound. If a check already fails, tell the user before changing anything; a change built on a broken baseline cannot be verified.
 
 ## 2. Classify the request
 
@@ -51,10 +52,12 @@ Tell the user the result in a few lines: the type, the phases that will run, the
 
 1. Open the iteration in `docs/project-status.md`: number, type, scope, and the phase log with unneeded phases marked Skipped and the reason.
 2. Delegate to the product-manager to record the request in `docs/requirements/backlog.md` with an ID, or to mark the chosen item In progress. Add the ID to the iteration's scope in the state file.
-3. Run each phase on the route as the lifecycle skill defines it: delegate with the standard prompt, check every delegation, meet the exit criteria, and stop at each approval gate that applies.
-4. In Verify, always have the qa-engineer run the full regression suite, not only the tests for the change.
-5. In Review, have the architect review only what changed, then update `docs/lifecycle/traceability.md` and write a short `docs/lifecycle/release-readiness.md` for this iteration.
-6. Always finish with Operate and learn: have the product-manager update the backlog, add the iteration to `docs/lifecycle/retrospective.md` citing the backlog IDs, and close the iteration in the state file.
+3. With a tracker, run `push` so the item has a card. With commits on, create the iteration branch named after that card's key, as the git-flow skill describes. On a route without Plan, the user's agreement to the route is the scope approval: move the card to ready.
+4. Run each phase on the route as the lifecycle skill defines it: delegate with the standard prompt, check every delegation, meet the exit criteria, and stop at each approval gate that applies.
+5. In Build, run the code review as the build command describes, unless the change touches no code. In Verify, always have the qa-engineer run the full regression suite, not only the tests for the change.
+6. In Review, have the code-reviewer review any code changed since its last review and the architect review only what changed, then update `docs/lifecycle/traceability.md` and write a short `docs/lifecycle/release-readiness.md` for this iteration.
+7. At approval A3, ask separately whether to push the branch and open a pull request. Commit and move cards at every phase exit, as the build command describes.
+8. Always finish with Operate and learn: have the product-manager update the backlog, add the iteration to `docs/lifecycle/retrospective.md` citing the backlog IDs, and close the iteration in the state file.
 
 ## Rules
 

@@ -11,6 +11,7 @@ This plugin is proprietary (see `LICENSE`). Contributions are accepted only from
    ```bash
    node scripts/validate-plugin.mjs
    node scripts/test-hooks.mjs
+   node scripts/test-tracker.mjs
    ```
 
 4. Try the change in a real session before opening a pull request. Load the plugin from your working copy with `claude --plugin-dir .` and run `/adlc-3d:status` or a small `/adlc-3d:build` brief.

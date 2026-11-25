@@ -29,13 +29,24 @@ The ADLC is a software development life cycle run by a team of agents and steere
 |---|---|---|---|---|---|---|
 | 1 | Plan | product-manager | An idea or a backlog item is chosen | `docs/requirements/requirements.md`, `user-stories.md`, `backlog.md` | Every Must requirement has a story; every criterion is testable and numbered; non-functional targets are set | **Approval A1: scope** |
 | 2 | Design | architect, then ux-ui-designer | A1 approved | `docs/architecture.md` with Contracts, `docs/decisions/`, the scaffold, `docs/design-spec.md` | The scaffold installs and builds; contracts cover the store, test hook and assets; every story in scope has its interactions and states; no document contradicts another | **Approval A2: design** |
-| 3 | Build | technical-artist, scene-developer, frontend-developer, backend-developer if needed, qa-engineer for the smoke test | A2 approved | Application code, unit tests, handoff notes | Lint, format check, type check, unit tests and build pass; no request between agents is open; the smoke test passes | Automatic |
+| 3 | Build | technical-artist, scene-developer, frontend-developer, backend-developer if needed, code-reviewer, qa-engineer for the smoke test | A2 approved | Application code, unit tests, handoff notes, `docs/code-review.md` | Lint, format check, type check, unit tests and build pass; no request between agents is open; no critical or major code-review finding is open; the smoke test passes | Automatic |
 | 4 | Verify | performance-optimiser, qa-engineer | The smoke test passes | `docs/performance.md`, `tests/e2e/`, `docs/qa-report.md` | Every criterion in scope has a result; no critical or major bug is open, unless the user accepted it as a known issue; every figure says how it was measured | Automatic |
-| 5 | Review | architect, the Tech Lead | Verify has exited | `docs/review.md`, `docs/lifecycle/traceability.md`, `docs/lifecycle/release-readiness.md` | No critical review finding is open; the test results are from after the last code change; the traceability matrix has no unexplained gap | **Approval A3: release** |
+| 5 | Review | architect, code-reviewer for code changed since its last review, the Tech Lead | Verify has exited | `docs/review.md`, `docs/code-review.md`, `docs/lifecycle/traceability.md`, `docs/lifecycle/release-readiness.md` | No critical review finding is open; the code review covers the last code change; the test results are from after the last code change; the traceability matrix has no unexplained gap | **Approval A3: release** |
 | 6 | Release | devops-engineer | A3 approved (on the Operations route, the change is prepared first and A3 approves it) | `.github/` workflows, hosting config, `docs/deployment.md`, `CHANGELOG.md` | The pipeline runs the scripts that pass locally; no secret is in any file; manual steps are listed | Automatic. Deploying needs its own explicit approval |
 | 7 | Operate and learn | the Tech Lead, product-manager, qa-engineer if deployed | Release has exited | `docs/lifecycle/retrospective.md`, updated `backlog.md` | The retrospective is written; every known gap is a backlog item; the iteration is closed in the state file | Automatic |
 
 A phase that an iteration does not need is recorded as **Skipped** with the reason. It is never left blank.
+
+The code review is skipped only when an iteration changes no code, such as a documents-only or pipeline-only change; record the reason in the phase log.
+
+## Cards and source control
+
+Work is also tracked outside the repository, so the people around the project can follow it without reading `docs/`:
+
+- **Cards.** Each story, backlog item, bug and agent task is a card in ClickUp or on a local board, moved through card states as the phases run. The card-tracking skill has the setup, the user's consent, the states for each phase and the tracker command
+- **Branches.** Each iteration is one branch named after its main card, committed at each phase exit and offered to the user as one pull request at approval A3. The git-flow skill has the rules
+- **The repository decides.** A gate passes or fails on the evidence in the repository. A tracker that is down, a missing token or a card moved by hand never blocks a gate and never counts as evidence; record it and carry on
+- **The user owns the outward steps.** Sending content to a tracker, committing, pushing, opening a pull request and merging each need the user's consent as those skills describe. Approval to release is not approval to push
 
 ## Gates
 
@@ -97,6 +108,10 @@ Application: <one or two sentences>
 Approval mode: Key gates
 Current iteration: 2 (Feature: CR-3 share link)
 Current phase: 3 Build
+Tracker: clickup (List 901234567, content full), approved by the user on 2026-11-02
+Git: commit at phase exits on the iteration branch, approved by the user on 2026-11-02
+Branch: feat/CU-86abc12-share-view-link
+Base: main at 4f2c9a1
 
 ## Iterations
 | # | Type | Scope | Started | Closed | Outcome |
@@ -123,6 +138,8 @@ Current phase: 3 Build
 ## Not verified
 ```
 
+`Tracker:` is `clickup (...)`, `local` or `none`; a state file without the line means none. `Git:` is the commit consent or `none`. `Branch:` and `Base:` are set when the iteration opens.
+
 Status values are Not started, In progress, Done, Skipped and Blocked. Use absolute dates. When an iteration closes, move its phase log into `docs/lifecycle/retrospective.md` and start a fresh log.
 
 ## Traceability
@@ -148,7 +165,8 @@ A row with no test, or a result that is not Verified, is a gap. Every gap on a M
 - Performance against each budget, with how it was measured
 - Accessibility against WCAG 2.2 AA (or the level in the requirements): automated violations by impact, and the manual checks done and not done
 - Security: the audit, licence and secret scan results, open OWASP findings, and whether the content security policy is report-only or enforced
-- Review findings still open, by severity
+- Review findings and code-review findings still open, by severity
+- Cards in scope and their states, from `docs/tracker/board.md`, if a tracker is set up
 - Traceability gaps on Must requirements
 - What is not verified, and what the user would need to do to verify it
 - Recommendation: release, release with known issues, or do not release, with the reason
@@ -177,6 +195,7 @@ Agents do not see the conversation and cannot ask the user anything. Every deleg
 Project: <the application in one or two sentences>
 Project folder: <absolute path>
 Iteration and phase: <for example, Iteration 2 (Feature: CR-3), phase 3 Build>
+Cards: <the IDs and card keys this task serves, for example US-7 (CU-86abc12)>
 Your task: <exactly what to produce, and for which stories or requirements>
 Read first: <documents and handoff notes>
 User decisions: <approvals and answers that affect this task>
@@ -210,4 +229,5 @@ An agent's report is a claim. Before accepting it:
 | A dependency, tool or network resource is unavailable | Record it in the state file and ask the user; do not work around it by changing their machine |
 | The requirements turn out to be wrong or incomplete | Return to phase 1 with the product-manager and the user; do not let developers guess |
 | A bug survives two fix rounds | Stop. Report it to the user with what was tried. If it is critical or major, the Verify gate needs the user's decision before it can exit; either way it goes into the release readiness report |
+| The tracker fails, the token is missing, or a card was changed by hand | Follow the card-tracking skill. Record it under Environment notes and carry on; it never blocks a gate |
 | An exit criterion cannot be verified in this environment | Record it as Not verified with the reason. It is untested coverage, not a pass and not a bug. If it is a Must requirement, the gate needs the user's decision |
