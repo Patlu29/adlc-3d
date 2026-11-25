@@ -26,6 +26,8 @@ If `docs/project-status.md` does not exist, say that no lifecycle has been start
 These read-only commands are allowed, because they change nothing:
 
 - With ClickUp as the tracker: `node "${CLAUDE_PLUGIN_ROOT}/tracker/cli.mjs" board --remote`, to report cards that people moved, deleted or created in ClickUp. If it exits with 2, 3 or 4, report that the tracker could not be read (the output says why) and carry on
+- With a `Sprint:` line: `node "${CLAUDE_PLUGIN_ROOT}/tracker/cli.mjs" sprint report --print`, for points completed against committed and the burndown
+- With ClickUp approvals on and a gate waiting: `node "${CLAUDE_PLUGIN_ROOT}/tracker/cli.mjs" gate status --gate <A1, A2 or A3>`. Exit 5 means pending
 - With a branch in the state file: `git status --short`, and `gh pr view <branch> --json state,mergedAt` if `gh` is installed, to report whether the pull request is open or merged. Never push, fetch into the working tree or change branches
 
 The card-tracking and git-flow skills (`adlc-3d:card-tracking`, `adlc-3d:git-flow`) explain what you find; load them if you need to.
@@ -50,6 +52,8 @@ Keep it short enough to read in a minute:
 **Bugs open:** <count by severity>
 **Code review:** <open findings by severity, or "not run this iteration">
 **Cards:** <count by state, drift from the tracker, or "no tracker">
+**Sprint:** <number, goal, points completed of committed, days left, or "no sprint">
+**Gate waiting:** <gate, and whether an approver has answered in ClickUp, or "none">
 **Branch:** <name, uncommitted changes, pull request open or merged, or "no git">
 **Not verified:** <items>
 **Backlog:** <count of open items, and the top three>

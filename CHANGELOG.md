@@ -2,6 +2,28 @@
 
 All notable changes to this plugin. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the plugin uses [semantic versioning](https://semver.org/). Release notes with upgrade steps are on the [releases page](https://github.com/Patlu29/adlc-3d/releases).
 
+## [4.1.0] - 2026-11-25
+
+### Added
+- **Estimates and Definition of Ready.** Stories carry story points in their heading (`(FR-5, Must, 3 pts)`) and an optional `Depends on:` line. The user-stories skill defines the scale and the Definition of Ready; the new `ready` command checks it, and the Plan phase exits only when every story in the sprint passes
+- **Sprints.** One sprint per iteration, planned in phase 1 up to capacity or velocity. `sprint start` creates an iteration card `IT-<n>`, tags the cards `sprint-<n>` and sets their end date; `sprint add` and `drop` record scope changes; `sprint report` writes points, scope changes, re-estimates and a daily burndown in local dates; `sprint close` records completed points and carry-over for velocity
+- **Notifications** to Slack incoming webhooks and Teams Workflows, at waiting gates, blockers, release approval and iteration close. URLs come only from `SLACK_WEBHOOK_URL` and `TEAMS_WEBHOOK_URL` in the user's shell, are checked against the expected hosts, and are never stored or printed. Best effort: failures never stop the lifecycle
+- **Approvals on cards (off by default).** With `config --clickup-approvals on`, approvers the user adds in their own terminal can answer A1, A2 or A3 on the iteration card with `Approve A1` or `Reject A1: <reason>`. Comments by the token owner never count, nothing read from a test server counts, the tracker refuses to post text that reads like a decision, the request time comes from ClickUp, the first decision stands, only a clean approval exits 0, and approval with changes, rejection, stale or conflicting decisions return to the Tech Lead and the user. Staleness is judged from the content of the work, so committing unchanged work does not void an approval
+- A Bash guard hook in ADLC projects blocks `approvers add` and `remove`, direct ClickUp API calls, pointing the tracker at another server, and commands that read the token or webhook URLs
+- `config` command to change the content mode, notifications and ClickUp approvals without losing other settings; `init --force` now keeps them too
+
+### Changed
+- Story points are sent to ClickUp; removing an estimate clears it there. Registries from 4.0 stay valid: only stories with points are re-pushed
+- `move` records each card's state history, and a queued move keeps the time it was asked for
+- New exit codes: 5 for a pending approval, 6 for stories that are not ready
+- Slack notification text is escaped, so it cannot mention a whole channel
+- If a workspace refuses story points (the Sprint Points ClickApp is off), cards are sent without them and the tracker says so once
+- Tests: 131 tracker checks and 85 hook checks
+
+### Upgrading
+- Existing projects keep working. Stories without estimates fail `ready` only when a new sprint is planned; add the points then
+- ClickUp approvals and notifications are off until the user turns them on
+
 ## [4.0.1] - 2026-11-25
 
 ### Fixed

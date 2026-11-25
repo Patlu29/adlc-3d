@@ -179,6 +179,41 @@ expectReview("conditional skip with a reason is allowed, bare skip is not, prose
 expectReview("non-ADLC folder is ignored", edit(plain, "src/ui/Panel.tsx", "adlc-3d:frontend-developer"), [["adlc-3d review", false]]);
 expectReview("malformed input fails open", "{oops", [["adlc-3d review", false]]);
 
+// Bash guard
+function expectBash(name, command, cwd, shouldDeny) {
+  count += 1;
+  const { code, out } = run("guard-bash.mjs", { tool_name: "Bash", cwd, tool_input: { command } });
+  const denied = code === 0 && /"permissionDecision":"deny"/.test(out);
+  if (code !== 0 || denied !== shouldDeny || /"allow"/.test(out)) {
+    failures += 1;
+    console.error(`FAIL: ${name} (expected ${shouldDeny ? "deny" : "no decision"}, got ${denied ? "deny" : "no decision"}; exit ${code})`);
+  }
+}
+const cli = 'node "/plugins/adlc-3d/tracker/cli.mjs"';
+expectBash("adding an approver is blocked", `${cli} approvers add alex`, project, true);
+expectBash("removing an approver is blocked", `${cli} approvers remove 12345`, join(project, "src"), true);
+expectBash("listing approvers is allowed", `${cli} approvers list`, project, false);
+expectBash("ordinary tracker commands are allowed", `${cli} move US-1 --state in_progress`, project, false);
+expectBash("direct ClickUp API calls are blocked", "curl -s https://api.clickup.com/api/v2/team", project, true);
+expectBash("reading the token is blocked", 'echo "$CLICKUP_API_TOKEN" | wc -c', project, true);
+expectBash("reading a webhook URL is blocked", "printenv SLACK_WEBHOOK_URL", project, true);
+expectBash("npm commands are allowed", "npm run build", project, false);
+expectBash("quoting the subcommand does not get round the guard", `${cli} approvers "add" alex`, project, true);
+expectBash("an approvers subcommand in a variable is blocked", `a=add; ${cli} approvers $a alex`, project, true);
+expectBash("searching the environment for the token is blocked", "env | grep CLICKUP_API_TOKEN", project, true);
+expectBash("printing the whole environment is blocked", "printenv", project, true);
+expectBash("env used to set a variable for one command is allowed", "env NODE_ENV=test npm run build", project, false);
+expectBash("pointing the tracker at another server is blocked", `CLICKUP_API_URL=http://127.0.0.1:9 ${cli} gate status --gate A1`, project, true);
+expectBash("outside an ADLC project nothing is blocked", "curl https://api.clickup.com/api/v2/team", plain, false);
+{
+  count += 1;
+  const { out } = run("guard-bash.mjs", { tool_name: "Bash", cwd: project, tool_input: { command: `${cli} approvers add alex` } }, { ADLC3D_HOOKS: "off" });
+  if (out) {
+    failures += 1;
+    console.error("FAIL: hooks off switches the Bash guard off");
+  }
+}
+
 rmSync(work, { recursive: true, force: true });
 
 if (failures) {

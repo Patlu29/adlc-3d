@@ -11,7 +11,7 @@ user-invocable: false
 ```markdown
 ## Epic E1: Explore the product in 3D
 
-### US-1: Rotate the model (FR-5, Must)
+### US-1: Rotate the model (FR-5, Must, 3 pts)
 As a shopper, I want to rotate the product by dragging, so that I can see it from every side.
 
 **Acceptance criteria**
@@ -20,6 +20,8 @@ As a shopper, I want to rotate the product by dragging, so that I can see it fro
 - Given I release the drag, when the model is still moving, then it eases to a stop within one second
 - Given I use only the keyboard, when the canvas has focus and I press the arrow keys, then the model rotates
 ```
+
+A story that needs another one first names it on its own line under the narrative: `Depends on: US-2`. The tracker reads the heading and this line, so keep both in this form.
 
 ## Rules
 
@@ -40,6 +42,33 @@ As a shopper, I want to rotate the product by dragging, so that I can see it fro
 | Then the camera moves smoothly to the planet | Then the camera reaches the planet in 1 to 2 seconds, and with reduced motion it arrives within 200 ms without animating |
 | Then the model is easy to tap | Then the tap target is at least 44 by 44 px at every zoom level |
 | Then the view resets | Then the camera returns to the first view, within 2 px of the original framing |
+
+## Estimates
+
+Size every story in story points, relative to the others: 1, 2, 3, 5 or 8. A point is not a time unit; it compares effort, complexity and uncertainty across the team's stories.
+
+| Points | Typical 3D story |
+|---|---|
+| 1 | A copy or token change, a new keyboard shortcut for an existing action |
+| 2 | A new panel field bound to an existing store value |
+| 3 | A new camera preset with its transition and reduced-motion variant |
+| 5 | Selecting a part with hover, highlight, details panel and keyboard alternative |
+| 8 | A new loaded model with materials, compression and a loading state |
+
+- More than 8 means the story is too big: split it by user outcome, not by layer
+- Write the estimate in the heading, as above. The architect reviews the estimates in the Design phase and asks for changes through its handoff note; you own the file and make them
+- Record a re-estimate by changing the heading. The tracker reports re-estimates made during a sprint
+
+## Definition of Ready
+
+A story can go into a sprint only when all of these are true. `node "${CLAUDE_PLUGIN_ROOT}/tracker/cli.mjs" ready --stories <IDs>` checks the first four, and the fifth as far as it can: it fails a dependency that does not exist and warns about one outside the sprint, which you confirm is already done:
+
+- It links to at least one requirement ID
+- It has a MoSCoW priority of Must, Should or Could
+- It has at least two numbered, testable acceptance criteria (more than six is a warning to split it)
+- It has an estimate of 1, 2, 3, 5 or 8 points
+- Every story it depends on exists, and is in the same sprint or already done
+- No open question would change what is built
 
 ## Epics for a typical 3D web app
 

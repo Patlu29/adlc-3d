@@ -27,7 +27,7 @@ The ADLC is a software development life cycle run by a team of agents and steere
 
 | # | Phase | Agents | Enter when | Artefacts | Exit when | Gate |
 |---|---|---|---|---|---|---|
-| 1 | Plan | product-manager | An idea or a backlog item is chosen | `docs/requirements/requirements.md`, `user-stories.md`, `backlog.md` | Every Must requirement has a story; every criterion is testable and numbered; non-functional targets are set | **Approval A1: scope** |
+| 1 | Plan | product-manager | An idea or a backlog item is chosen | `docs/requirements/requirements.md`, `user-stories.md`, `backlog.md` | Every Must requirement has a story; every criterion is testable and numbered; non-functional targets are set; every story in the sprint meets the Definition of Ready and the sprint fits its capacity, or the user accepted it over capacity | **Approval A1: scope** |
 | 2 | Design | architect, then ux-ui-designer | A1 approved | `docs/architecture.md` with Contracts, `docs/decisions/`, the scaffold, `docs/design-spec.md` | The scaffold installs and builds; contracts cover the store, test hook and assets; every story in scope has its interactions and states; no document contradicts another | **Approval A2: design** |
 | 3 | Build | technical-artist, scene-developer, frontend-developer, backend-developer if needed, code-reviewer, qa-engineer for the smoke test | A2 approved | Application code, unit tests, handoff notes, `docs/code-review.md` | Lint, format check, type check, unit tests and build pass; no request between agents is open; no critical or major code-review finding is open; the smoke test passes | Automatic |
 | 4 | Verify | performance-optimiser, qa-engineer | The smoke test passes | `docs/performance.md`, `tests/e2e/`, `docs/qa-report.md` | Every criterion in scope has a result; no critical or major bug is open, unless the user accepted it as a known issue; every figure says how it was measured | Automatic |
@@ -45,7 +45,8 @@ Work is also tracked outside the repository, so the people around the project ca
 
 - **Cards.** Each story, backlog item, bug and agent task is a card in ClickUp or on a local board, moved through card states as the phases run. The card-tracking skill has the setup, the user's consent, the states for each phase and the tracker command
 - **Branches.** Each iteration is one branch named after its main card, committed at each phase exit and offered to the user as one pull request at approval A3. The git-flow skill has the rules
-- **The repository decides.** A gate passes or fails on the evidence in the repository. A tracker that is down, a missing token or a card moved by hand never blocks a gate and never counts as evidence; record it and carry on
+- **Sprints.** Each iteration is one sprint, planned in phase 1 from sized stories that meet the Definition of Ready, up to the team's capacity. The card-tracking skill has sprint planning, the burndown and velocity
+- **The repository decides.** A gate passes or fails on the evidence in the repository. A tracker that is down, a missing token or a card moved by hand never blocks a gate and never counts as evidence; record it and carry on. The one thing taken from the tracker is a gate decision by a named approver, when the user has switched ClickUp approvals on, under the rules in the card-tracking skill
 - **The user owns the outward steps.** Sending content to a tracker, committing, pushing, opening a pull request and merging each need the user's consent as those skills describe. Approval to release is not approval to push
 
 ## Gates
@@ -63,6 +64,8 @@ There are two kinds of gate.
 | Approve | The phase exits and the next begins |
 | Approve with changes | The owning agent makes the changes, the gate checks re-run, and work continues without asking again unless the changes alter scope |
 | Reject | The phase re-runs with the user's reasons quoted to the owning agent |
+
+The user gives the decision in chat. If the user has switched ClickUp approvals on, a named approver may also give Approve or Reject on the iteration card, as the card-tracking skill describes; approval with changes, a stale or conflicting decision, and anything outside A1, A2 and A3 always come back to the user in chat.
 
 Each approval summary contains: what was produced, what was verified and how, what is not verified, the open questions with a recommendation for each, and the decision being asked for.
 
@@ -112,6 +115,9 @@ Tracker: clickup (List 901234567, content full), approved by the user on 2026-11
 Git: commit at phase exits on the iteration branch, approved by the user on 2026-11-02
 Branch: feat/CU-86abc12-share-view-link
 Base: main at 4f2c9a1
+Sprint: 2, "Share the current view", 2026-11-11 to 2026-11-22, capacity 13 pts
+Notify: slack, approved by the user on 2026-11-02
+ClickUp approvals: on (approvers alex, sam), approved by the user on 2026-11-02
 
 ## Iterations
 | # | Type | Scope | Started | Closed | Outcome |
@@ -129,7 +135,8 @@ Base: main at 4f2c9a1
 ## Approvals
 | Gate | Iteration | Decision | Given by | Date | Covers |
 |---|---|---|---|---|---|
-| A1 scope | 2 | Approved | User | 2026-11-11 | US-7 |
+| A1 scope | 2 | Approved | User, in chat | 2026-11-11 | US-7 |
+| A2 design | 2 | Approved | alex via ClickUp | 2026-11-12 | docs/design-spec.md 4.3 |
 
 ## Decisions and answers
 ## Open questions (owner)

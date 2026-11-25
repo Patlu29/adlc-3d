@@ -25,6 +25,7 @@ export function parseStories(text) {
     const storyMatch = /^###\s+(US-\d+)\s*:\s*(.+?)\s*(?:\(([^)]*)\))?\s*$/.exec(line);
     if (storyMatch) {
       const tokens = (storyMatch[3] || "").split(",").map((t) => t.trim());
+      const pointsToken = tokens.map((t) => /^(\d+(?:\.5)?)\s*(?:pts?|points?)$/i.exec(t)).find(Boolean);
       story = {
         id: storyMatch[1],
         kind: "story",
@@ -32,6 +33,8 @@ export function parseStories(text) {
         epic,
         requirements: tokens.filter((t) => ID.test(t)),
         priority: tokens.find((t) => /^(must|should|could|won't|wont)$/i.test(t)) || "",
+        points: pointsToken ? Number(pointsToken[1]) : null,
+        dependsOn: [],
         narrative: [],
         criteria: [],
       };
@@ -44,6 +47,11 @@ export function parseStories(text) {
       continue;
     }
     if (!story) continue;
+    const depends = /^(?:\*\*)?Depends on(?::\*\*|\*\*:|:)\s*(.+)$/i.exec(line.trim());
+    if (depends && !inCriteria) {
+      story.dependsOn = depends[1].split(/[,\s]+/).filter((t) => ID.test(t));
+      continue;
+    }
     if (/^\*\*Acceptance criteria\*\*/i.test(line.trim())) {
       inCriteria = true;
       continue;
@@ -154,7 +162,13 @@ export function renderCard(card, { content = "full", results = {}, parentTitle =
   if (card.kind === "story") {
     priority = PRIORITY[String(card.priority).toLowerCase()] ?? null;
     if (card.epic) tags.push(`epic-${card.epic.id.toLowerCase()}`);
-    const meta = [`Story ${card.id}`, card.priority, card.requirements.length ? `Requirements: ${card.requirements.join(", ")}` : ""];
+    const meta = [
+      `Story ${card.id}`,
+      card.priority,
+      card.points != null ? `${card.points} pts` : "",
+      card.requirements.length ? `Requirements: ${card.requirements.join(", ")}` : "",
+      card.dependsOn?.length ? `Depends on: ${card.dependsOn.join(", ")}` : "",
+    ];
     lines.push(meta.filter(Boolean).join(" | "));
     if (card.epic) lines.push(`Epic ${card.epic.id}${minimal ? "" : `: ${card.epic.title}`}`);
     if (!minimal && card.narrative.length) lines.push("", card.narrative.join(" "));
@@ -177,6 +191,10 @@ export function renderCard(card, { content = "full", results = {}, parentTitle =
     if (card.links) lines.push(`Links: ${card.links}`);
     if (!minimal && card.source) lines.push(`Source: ${card.source}`);
     lines.push("", "Recorded in docs/requirements/backlog.md");
+  } else if (card.kind === "iteration") {
+    lines.push(`Sprint ${card.number} | ${card.start} to ${card.end} | capacity ${card.capacity} pts | committed ${card.committedPoints} pts`);
+    lines.push("", `Cards: ${card.cards.join(", ")}`);
+    lines.push("", "Approval requests and decisions for this iteration are comments on this card.");
   } else if (card.kind === "task") {
     lines.push(`Work by the ${card.agent} agent on ${card.parentId}${minimal || !parentTitle ? "" : `: ${parentTitle}`}`);
     lines.push("", `Handoff note: docs/handoffs/${card.agent}.md`);
@@ -185,11 +203,33 @@ export function renderCard(card, { content = "full", results = {}, parentTitle =
   const title = card.kind === "task" ? (minimal || !parentTitle ? card.agent : `${card.agent}: ${parentTitle}`) : card.title;
   const name = `[${card.id}] ${title}`.slice(0, 250);
   const description = lines.join("\n");
-  return { name, description, tags, priority };
+  return { name, description, tags, priority, points: card.kind === "story" ? card.points ?? null : null };
 }
 
+// Points join the hash only when a story has them, so registries written by 4.0 stay valid.
 export function hashRendered(rendered) {
-  return createHash("sha256").update(JSON.stringify([rendered.name, rendered.description, rendered.priority])).digest("hex").slice(0, 16);
+  const parts = [rendered.name, rendered.description, rendered.priority];
+  if (rendered.points != null) parts.push(rendered.points);
+  return createHash("sha256").update(JSON.stringify(parts)).digest("hex").slice(0, 16);
+}
+
+const FIBONACCI = new Set([1, 2, 3, 5, 8]);
+
+// The machine-checkable part of the Definition of Ready in the user-stories skill.
+export function readiness(story, allIds) {
+  const problems = [];
+  const warnings = [];
+  if (!story.requirements.length) problems.push("no requirement ID");
+  if (/^won'?t$/i.test(story.priority)) problems.push("priority Won't cannot enter a sprint");
+  else if (!/^(must|should|could)$/i.test(story.priority)) problems.push("no MoSCoW priority");
+  const n = story.criteria.length;
+  if (n < 2) problems.push(`${n} acceptance criteria (needs at least 2)`);
+  else if (n > 6) warnings.push(`${n} acceptance criteria; consider splitting the story`);
+  if (story.points == null) problems.push("no estimate");
+  else if (story.points > 8) problems.push(`${story.points} pts is too large; split the story`);
+  else if (!FIBONACCI.has(story.points)) problems.push(`${story.points} pts is not 1, 2, 3, 5 or 8`);
+  for (const dep of story.dependsOn || []) if (!allIds.has(dep)) problems.push(`depends on ${dep}, which does not exist`);
+  return { problems, warnings };
 }
 
 // "[US-3] Rotate the model" -> "US-3"; "[US-3/scene-developer] ..." -> "US-3/scene-developer"

@@ -12,6 +12,9 @@ import { fileURLToPath } from "node:url";
 const CLI = fileURLToPath(new URL("../tracker/cli.mjs", import.meta.url));
 const TOKEN = ["pk", "1234567", "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345"].join("_");
 const LIST = "900";
+const OWNER = { id: 1, username: "token-owner", email: "owner@example.invalid" };
+const ALEX = { id: 2, username: "alex", email: "alex@example.invalid" };
+const SAM = { id: 3, username: "sam", email: "sam@example.invalid" };
 let failures = 0;
 let passes = 0;
 
@@ -37,7 +40,21 @@ const mock = {
   ],
   seq: 0,
   pageSize: 2,
+  clock: Date.now(),
+  replies: new Map(), // comment id -> [comments]
+  webhooks: [], // { path, body }
 };
+
+// Adds a comment as someone other than the token owner, as a person in ClickUp would.
+function addComment(taskId, user, text, { replyTo } = {}) {
+  mock.clock += 1000;
+  const comment = { id: `c${++mock.seq}`, date: String(mock.clock), user, comment_text: text };
+  if (replyTo) {
+    if (!mock.replies.has(replyTo)) mock.replies.set(replyTo, []);
+    mock.replies.get(replyTo).push(comment);
+  } else mock.tasks.get(taskId).thread.push(comment);
+  return comment;
+}
 
 function countOf(method, pattern) {
   return mock.requests.filter((r) => r.method === method && pattern.test(r.path)).length;
@@ -54,6 +71,10 @@ const server = createServer((req, res) => {
       res.writeHead(status, { "Content-Type": "application/json", ...headers });
       res.end(JSON.stringify(data));
     };
+    if (path.startsWith("/hook/")) {
+      mock.webhooks.push({ path, body: raw ? JSON.parse(raw) : null });
+      return send(path === "/hook/teams" ? 202 : 200, {});
+    }
     if (req.headers.authorization !== TOKEN) return send(401, { err: "Token invalid", ECODE: "OAUTH_025" });
     const rule = mock.fail.find((f) => f.method === req.method && f.pattern.test(path) && f.times > 0);
     if (rule && !rule.apply) {
@@ -88,7 +109,10 @@ const server = createServer((req, res) => {
         priority: body.priority,
         parent: body.parent || null,
         url: `https://app.clickup.test/t/${id}`,
+        points: body.points ?? null,
+        due_date: null,
         comments: [],
+        thread: [],
       };
       mock.tasks.set(id, task);
       return sendOrFail(200, task);
@@ -102,6 +126,8 @@ const server = createServer((req, res) => {
         if (body.description !== undefined) task.description = body.description;
         if (body.status !== undefined) task.status = { status: body.status };
         if (body.priority !== undefined) task.priority = body.priority;
+        if (body.points !== undefined) task.points = body.points;
+        if (body.due_date !== undefined) task.due_date = body.due_date;
         return send(200, task);
       }
     }
@@ -109,8 +135,31 @@ const server = createServer((req, res) => {
       const task = mock.tasks.get(m[1]);
       if (!task) return send(404, { err: "Task not found" });
       task.comments.push(body.comment_text);
-      return send(200, { id: `c${task.comments.length}` });
+      mock.clock += 1000;
+      const comment = { id: `c${++mock.seq}`, date: String(mock.clock), user: OWNER, comment_text: body.comment_text, notify_all: body.notify_all };
+      task.thread.push(comment);
+      return send(200, { id: comment.id, date: comment.date });
     }
+    if ((m = /^\/task\/([^/]+)\/comment$/.exec(path)) && req.method === "GET") {
+      const task = mock.tasks.get(m[1]);
+      if (!task) return send(404, { err: "Task not found" });
+      const start = url.searchParams.get("start");
+      const newestFirst = [...task.thread].sort((a, b) => Number(b.date) - Number(a.date));
+      const older = start ? newestFirst.filter((c) => Number(c.date) < Number(start)) : newestFirst;
+      return send(200, { comments: older.slice(0, 25) });
+    }
+    if ((m = /^\/comment\/([^/]+)\/reply$/.exec(path)) && req.method === "GET") return send(200, { comments: mock.replies.get(m[1]) || [] });
+    if ((m = /^\/task\/([^/]+)\/tag\/([^/]+)$/.exec(path))) {
+      const task = mock.tasks.get(m[1]);
+      if (!task) return send(404, { err: "Task not found" });
+      const tag = decodeURIComponent(m[2]);
+      if (req.method === "POST" && !task.tags.includes(tag)) task.tags.push(tag);
+      if (req.method === "DELETE") task.tags = task.tags.filter((t) => t !== tag);
+      return send(200, {});
+    }
+    if (req.method === "GET" && path === "/user") return send(200, { user: OWNER });
+    if (req.method === "GET" && path === "/team")
+      return send(200, { teams: [{ id: "77", name: "Test", members: [OWNER, ALEX, SAM].map((user) => ({ user })) }] });
     return send(404, { err: `no mock for ${req.method} ${path}` });
   });
 });
@@ -459,6 +508,187 @@ try {
     ok(r.code === 1 && /b\.ts: an added line looks like a ClickUp API token/.test(r.out) && /\.env: a \.env file/.test(r.out), "staged credentials and .env files are caught", r.out);
     ok(!r.out.includes(TOKEN), "the scan never prints the credential");
   }
+  // ---------- 4.1: readiness, points, sprints, notifications, approvals ----------
+  {
+    mock.tasks.clear();
+    mock.fail = [];
+    const sp = makeProject();
+    const sized = STORIES.replace("(FR-5, Must)", "(FR-5, Must, 3 pts)")
+      .replace("(FR-6, Should)", "(FR-6, Should, 5 pts)\nDepends on: US-1")
+      .replace("then the shade changes within 200 ms", "then the shade changes within 200 ms\n- AC-2: Given reduced motion is on, when I pick a colour, then the shade changes without a transition");
+    // Sprint dates around today, so the burndown test holds whenever it runs.
+    const dayOffset = (n) => new Date(Date.now() + n * 86400000).toLocaleDateString("en-CA");
+    const [d0, dToday, dEnd, d2s, d2e] = [dayOffset(-1), dayOffset(0), dayOffset(10), dayOffset(14), dayOffset(24)];
+    let r = await run(sp, ["ready", "--stories", "US-1,US-2"]);
+    ok(r.code === 6 && /US-1 \| \? \| no \| no estimate/.test(r.out), "ready fails a story with no estimate", r.out);
+    r = await run(sp, ["ready"]);
+    ok(r.code === 0, "ready without a sprint scope is information only", r.out);
+    writeFileSync(join(sp, "docs", "requirements", "user-stories.md"), sized.replace("5 pts", "13 pts"));
+    r = await run(sp, ["ready", "--stories", "US-2"]);
+    ok(r.code === 6 && /13 pts is too large/.test(r.out) && /\(warning\) depends on US-1, which is not in this sprint/.test(r.out), "ready flags oversized stories and dependencies outside the sprint", r.out);
+    writeFileSync(join(sp, "docs", "requirements", "user-stories.md"), sized);
+    r = await run(sp, ["ready", "--stories", "US-1,US-2"]);
+    ok(r.code === 0 && /2 of 2 stories ready, 8 pts/.test(r.out), "sized stories are ready", r.out);
+
+    await run(sp, ["init", "--provider", "clickup", "--list", LIST]);
+    r = await run(sp, ["push"]);
+    ok(r.code === 0 && tasksNamed("US-1")[0].points === 3 && /Depends on: US-1/.test(tasksNamed("US-2")[0].description), "points and dependencies reach ClickUp", r.out);
+
+    // Sprint start
+    r = await run(sp, ["sprint", "start", "--number", "1", "--goal", "Rotate and recolour", "--start", d0, "--end", dEnd, "--capacity", "6", "--cards", "US-1,US-2,BUG-1"]);
+    const it = tasksNamed("IT-1")[0];
+    ok(r.code === 0 && it && it.tags.includes("adlc-iteration") && /8 pts committed/.test(r.out) && /over capacity by 2 pts/.test(r.out), "sprint start creates the iteration card and warns when over capacity", r.out);
+    ok(tasksNamed("US-1")[0].tags.includes("sprint-1") && tasksNamed("US-1")[0].due_date, "sprint cards are tagged and get the end date");
+    const putsBefore = countOf("POST", /\/tag\//);
+    r = await run(sp, ["sprint", "start", "--number", "1", "--goal", "Rotate and recolour", "--start", d0, "--end", dEnd, "--capacity", "6", "--cards", "US-1,US-2,BUG-1"]);
+    ok(r.code === 0 && tasksNamed("IT-1").length === 1 && countOf("POST", /\/tag\//) === putsBefore, "sprint start can be run again without duplicates", r.out);
+    r = await run(sp, ["sprint", "start", "--number", "2", "--goal", "Next", "--start", d2s, "--end", d2e, "--capacity", "6", "--cards", "CR-1"]);
+    ok(r.code === 1 && /sprint 1 is still open/.test(r.out), "a second sprint cannot start while one is open", r.out);
+
+    // Scope change, history, report
+    r = await run(sp, ["sprint", "add", "--cards", "CR-1"]);
+    ok(r.code === 0 && tasksNamed("CR-1")[0].tags.includes("sprint-1"), "sprint add tags the card", r.out);
+    r = await run(sp, ["sprint", "drop", "--cards", "CR-1"]);
+    ok(r.code === 0 && !tasksNamed("CR-1")[0].tags.includes("sprint-1") && tasksNamed("CR-1")[0].due_date === null, "sprint drop removes the tag and the due date", r.out);
+    await run(sp, ["move", "US-1", "--state", "ready_for_release", "--at", new Date(`${dToday}T09:00:00`).toISOString()]);
+    const snapshot = readFileSync(join(sp, "docs", "tracker", "remote.json"), "utf8");
+    r = await run(sp, ["sprint", "report", "--print"]);
+    ok(r.code === 0 && /Committed at start: 8 pts/.test(r.out) && /Completed: 3 pts/.test(r.out) && new RegExp(`\\| ${d0} \\| 8 \\| 8 \\|`).test(r.out), "sprint report shows points and the burndown", r.out);
+    ok(/\| CR-1 \| add \|/.test(r.out) && /\| CR-1 \| drop \|/.test(r.out), "sprint report lists scope changes", r.out);
+    ok(readFileSync(join(sp, "docs", "tracker", "remote.json"), "utf8") === snapshot && !existsSync(join(sp, "docs", "tracker", "sprint-1.md")), "sprint report --print writes nothing");
+    ok(new RegExp(`\\| ${dToday} \\| 5 \\|`).test(r.out), "a move is filed under the local day it happened", r.out);
+    writeFileSync(join(sp, "docs", "requirements", "user-stories.md"), sized.replace("5 pts", "3 pts"));
+    r = await run(sp, ["sprint", "report", "--print"]);
+    ok(/\| US-2 \| 5 \| 3 \|/.test(r.out), "re-estimates during the sprint are reported", r.out);
+
+    // A queued move keeps its time
+    mock.fail.push({ method: "PUT", pattern: /^\/task\//, status: 503, times: 20 });
+    r = await run(sp, ["move", "US-2", "--state", "in_progress"]);
+    const queued = state(sp).pending[0]?.argv || [];
+    ok(r.code === 3 && queued.includes("--at"), "a queued move records when it was asked for", queued.join(" "));
+    mock.fail = [];
+    r = await run(sp, ["sprint", "close"]);
+    ok(r.code === 2 && /still queued/.test(r.out), "a sprint cannot close while moves are queued", r.out);
+    await run(sp, ["board"]);
+    await run(sp, ["move", "BUG-1", "--state", "done"]);
+
+    // Close and velocity
+    r = await run(sp, ["sprint", "close"]);
+    ok(r.code === 0 && /3 pts completed/.test(r.out) && /carried over: US-2/.test(r.out) && existsSync(join(sp, "docs", "tracker", "sprint-1.md")), "sprint close records completed points and carry-over", r.out);
+    r = await run(sp, ["sprint", "report", "--print"]);
+    ok(r.code === 0 && /Closed on/.test(r.out) && /\| ready_for_release \| US-1 \|/.test(r.out), "a closed sprint is reported as it stood when it closed, without naming it", r.out);
+    r = await run(sp, ["sprint", "start", "--number", "1", "--goal", "Rotate and recolour", "--start", d0, "--end", dEnd, "--capacity", "6", "--cards", "US-1,US-2,BUG-1"]);
+    ok(r.code === 1 && /sprint 1 is closed/.test(r.out), "a closed sprint cannot be started again", r.out);
+    r = await run(sp, ["sprint", "start", "--number", "2", "--goal", "Finish recolour", "--start", d2s, "--end", d2e, "--capacity", "6", "--cards", "US-2"]);
+    r = await run(sp, ["sprint", "start", "--number", "2", "--goal", "Something else", "--start", d2s, "--end", d2e, "--capacity", "9", "--cards", "US-2"]);
+    ok(r.code === 1 && /different goal/.test(r.out), "restarting a sprint with different settings is refused", r.out);
+    r = await run(sp, ["sprint", "report", "--print"]);
+    ok(/Velocity \(last three sprints\): 3 pts/.test(r.out), "velocity comes from closed sprints", r.out);
+
+    // Notifications
+    const hook = (name) => `${baseUrl}/hook/${name}`;
+    r = await run(sp, ["config", "--notify", "slack,teams"]);
+    ok(r.code === 0 && /Notifications: slack, teams/.test(r.out), "config sets notification channels", r.out);
+    r = await run(sp, ["notify", "--event", "approval", "--text", "Scope for sprint 2 is ready", "--link", "https://app.clickup.test/t/1"], { ADLC3D_NOTIFY_TEST: "1", SLACK_WEBHOOK_URL: hook("slack"), TEAMS_WEBHOOK_URL: hook("teams") });
+    const slack = mock.webhooks.find((w) => w.path === "/hook/slack")?.body;
+    const teams = mock.webhooks.find((w) => w.path === "/hook/teams")?.body;
+    ok(r.code === 0 && /slack: sent/.test(r.out) && /teams: sent/.test(r.out), "notify sends to Slack and Teams (Teams answers 202)", r.out);
+    ok(/\[adlc-3d\] Approval needed: Scope for sprint 2/.test(slack?.text || "") && teams?.attachments?.[0]?.content?.type === "AdaptiveCard", "payloads match Slack and Teams Workflows formats", JSON.stringify({ slack, teams }));
+    mock.webhooks.length = 0;
+    await run(sp, ["notify", "--event", "blocked", "--text", "<!channel> see <https://evil.test|here>"], { ADLC3D_NOTIFY_TEST: "1", SLACK_WEBHOOK_URL: hook("slack") });
+    ok(/&lt;!channel&gt;/.test(mock.webhooks[0]?.body?.text || ""), "Slack text is escaped, so it cannot mention the channel", JSON.stringify(mock.webhooks[0]?.body));
+    r = await run(sp, ["notify", "--event", "approval", "--text", "x"], { SLACK_WEBHOOK_URL: hook("slack"), TEAMS_WEBHOOK_URL: "https://evil.example.com/webhook" });
+    ok(r.code === 0 && /slack: SLACK_WEBHOOK_URL does not point at the expected Slack/.test(r.out) && /teams: TEAMS_WEBHOOK_URL does not point/.test(r.out) && !r.out.includes("evil.example.com"), "webhooks on other hosts are refused without printing the URL", r.out);
+    r = await run(sp, ["notify", "--event", "closed", "--text", "done"]);
+    ok(r.code === 0 && /SLACK_WEBHOOK_URL is not set/.test(r.out), "a missing webhook is reported, not fatal", r.out);
+    r = await run(sp, ["notify", "--event", "approval", "--text", `key ${["AKIA", "Q3EGRZ7PL2XN5VHM"].join("")}`], { ADLC3D_NOTIFY_TEST: "1", SLACK_WEBHOOK_URL: hook("slack") });
+    ok(r.code === 1, "a notification containing a credential is refused", r.out);
+
+    // Approvals on cards
+    r = await run(sp, ["gate", "status", "--gate", "A1"]);
+    ok(r.code === 5 && /approvals are off/.test(r.out), "with ClickUp approvals off, gate status gives no decision (exit 5)", r.out);
+    await run(sp, ["config", "--clickup-approvals", "on"]);
+    r = await run(sp, ["gate", "request", "--gate", "A1", "--text", "Sprint 2 scope: US-2"]);
+    ok(r.code === 2 && /no approvers are set/.test(r.out), "a gate request needs approvers", r.out);
+    r = await run(sp, ["approvers", "add", "token-owner"]);
+    ok(r.code === 1 && /cannot count as approvals/.test(r.out), "the token owner cannot be an approver", r.out);
+    r = await run(sp, ["approvers", "add", "alex"]);
+    r = await run(sp, ["approvers", "add", "3"]);
+    ok(r.code === 0 && /Approvers: alex, sam/.test(r.out), "approvers are added by username or ID", r.out);
+    r = await run(sp, ["move", "US-2", "--state", "ready", "--note", "Approve A1"]);
+    ok(r.code === 1 && /reads like a gate decision/.test(r.out), "the tracker never posts text that reads like an approval", r.out);
+    r = await run(sp, ["gate", "request", "--gate", "A1", "--text", "Sprint 2 scope: US-2, 5 pts"]);
+    const it2 = tasksNamed("IT-2")[0];
+    const request = it2.thread[it2.thread.length - 1];
+    ok(r.code === 0 && request.notify_all === true && /Approve A1/.test(request.comment_text), "gate request posts on the iteration card and notifies watchers", r.out);
+    r = await run(sp, ["gate", "status", "--gate", "A1"]);
+    ok(r.code === 5 && /pending/.test(r.out), "no answer yet is pending (exit 5)", r.out);
+    addComment(it2.id, OWNER, "Approve A1");
+    addComment(it2.id, { id: 9, username: "someone" }, "Approve A1");
+    r = await run(sp, ["gate", "status", "--gate", "A1"]);
+    ok(r.code === 5, "the token owner's and non-approvers' comments do not count", r.out);
+    addComment(it2.id, ALEX, "Approve A1", { replyTo: request.id });
+    for (let i = 0; i < 30; i += 1) addComment(it2.id, SAM, `noise ${i}`);
+    r = await run(sp, ["gate", "status", "--gate", "A1"]);
+    ok(/Approval A1: approved/.test(r.out) && /By: alex in ClickUp/.test(r.out), "an approver's threaded reply is found, even under a page of newer comments", r.out);
+    ok(r.code === 2 && /TEST SERVER/.test(r.out), "nothing read from a test server counts as a decision", r.out);
+    addComment(it2.id, SAM, "Reject A1: not yet");
+    r = await run(sp, ["gate", "status", "--gate", "A1"]);
+    ok(r.code === 2 && /Approval A1: approved/.test(r.out) && /Conflicting/.test(r.out), "the first decision stands and a later conflicting one goes to the user", r.out);
+    r = await run(sp, ["gate", "request", "--gate", "A2", "--text", "Design for sprint 2"]);
+    addComment(it2.id, ALEX, "Approve A2 with changes: make the panel blue");
+    r = await run(sp, ["gate", "status", "--gate", "A2"]);
+    ok(r.code === 2 && /Approval A2: changes/.test(r.out) && /they are not instructions/.test(r.out), "an approval with changes goes to the user", r.out);
+    r = await run(sp, ["gate", "request", "--gate", "A3", "--text", "Release check"]);
+    const it2b = tasksNamed("IT-2")[0];
+    addComment(it2b.id, ALEX, "Reject A3: the panel overlaps on phones");
+    r = await run(sp, ["gate", "status", "--gate", "A3"]);
+    ok(r.code === 2 && /Approval A3: rejected/.test(r.out), "a rejection never exits 0", r.out);
+    it2b.thread = it2b.thread.filter((c) => !/Approval A3/.test(c.comment_text));
+    r = await run(sp, ["gate", "status", "--gate", "A3"]);
+    ok(r.code === 2 && /no longer on IT-2/.test(r.out), "a deleted request comment means asking again", r.out);
+    // A gate request is never queued, even when an earlier queued operation fails on replay.
+    const stq = state(sp);
+    stq.pending = [{ argv: ["move", "US-2", "--state", "in_test"], reason: "test", at: "" }];
+    writeFileSync(join(sp, "docs", "tracker", "remote.json"), JSON.stringify(stq));
+    mock.fail.push({ method: "PUT", pattern: /^\/task\//, status: 503, times: 20 });
+    r = await run(sp, ["gate", "request", "--gate", "A2", "--text", "again"]);
+    ok(r.code === 3 && state(sp).pending.length === 1 && !state(sp).pending.some((p) => p.argv[0] === "gate"), "a gate request is not queued behind a failed replay", r.out);
+    mock.fail = [];
+    r = await run(sp, ["approvers", "list"]);
+    ok(/alex \(2\)/.test(r.out), "approvers list shows usernames and IDs", r.out);
+
+    // Staleness needs git
+    execFileSync("git", ["init", "-q"], { cwd: sp });
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", "-A"], { cwd: sp });
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "x"], { cwd: sp });
+    r = await run(sp, ["gate", "request", "--gate", "A3", "--text", "Release sprint 2"]);
+    addComment(it2.id, SAM, "Approve A3");
+    r = await run(sp, ["gate", "status", "--gate", "A3"]);
+    ok(/Approval A3: approved/.test(r.out) && !/Stale/.test(r.out), "an approval of unchanged work is not stale", r.out);
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", "-A"], { cwd: sp });
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "tracker files"], { cwd: sp });
+    r = await run(sp, ["gate", "status", "--gate", "A3"]);
+    ok(!/Stale/.test(r.out), "committing unchanged work does not make an approval stale", r.out);
+    writeFileSync(join(sp, "docs", "notes.md"), "new untracked doc\n");
+    r = await run(sp, ["gate", "status", "--gate", "A3"]);
+    ok(/Stale/.test(r.out), "a new untracked file makes an approval stale", r.out);
+    rmSync(join(sp, "docs", "notes.md"));
+    writeFileSync(join(sp, "docs", "requirements", "user-stories.md"), sized + "\n<!-- edited -->\n");
+    r = await run(sp, ["gate", "status", "--gate", "A3"]);
+    ok(r.code === 2 && /Stale/.test(r.out), "an approval goes stale when the work changes after the request", r.out);
+
+    // init --force keeps later choices
+    r = await run(sp, ["init", "--provider", "clickup", "--list", LIST, "--force"]);
+    const cfg = JSON.parse(readFileSync(join(sp, "docs", "tracker", "config.json"), "utf8"));
+    ok(cfg.approvers?.length === 2 && cfg.notify?.length === 2 && cfg.clickupApprovals === true, "init --force keeps approvers, notifications and the approvals switch", JSON.stringify(cfg));
+
+    // Removing an estimate clears it in ClickUp
+    writeFileSync(join(sp, "docs", "requirements", "user-stories.md"), STORIES);
+    r = await run(sp, ["push"]);
+    ok(tasksNamed("US-1")[0].points === null, "removing an estimate clears the points in ClickUp", r.out);
+  }
+
 } finally {
   server.close();
 }
