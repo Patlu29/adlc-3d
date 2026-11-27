@@ -47,10 +47,10 @@ The Tech Lead checks your environment, agrees the project folder, then runs the 
 | 3 | Build | Scene, assets, interface and any backend built in parallel, integrated, code reviewed and smoke tested | Automatic, on passing checks and no open critical or major review finding |
 | 4 | Verify | Performance measured and improved; every acceptance criterion tested; bugs fixed and re-tested | Automatic, on test evidence |
 | 5 | Review | Architect's release review, a code review of late changes, traceability matrix and a one-page release readiness report | **You approve the release** |
-| 6 | Release | Pipeline, hosting config, deployment notes and changelog. Nothing is deployed or pushed without your separate approval | Automatic |
+| 6 | Release | 6a: pipeline, hosting config, environments, rollback and changelog for the release version. 6b, after you merge and only if you want it deployed: staging, the staging check, your UAT sign-off, production, then the version tag. Every deploy and push needs your separate approval | 6a automatic. 6b: **you sign off UAT** |
 | 7 | Operate and learn | Retrospective, and every known gap recorded in the backlog | Automatic |
 
-If you want to approve every phase, or none, say so when you start; the default is the three key gates.
+If you want to approve every phase, or none, say so when you start; the default is the three key gates. Whatever you choose, you always sign off UAT before a production deploy, and approve every deploy and push yourself.
 
 At the start, the Tech Lead also asks which tracker to use and whether it may commit at phase exits. See [Cards and ClickUp](#cards-and-clickup) and [Branches and pull requests](#branches-and-pull-requests).
 
@@ -60,6 +60,7 @@ At the start, the Tech Lead also asks which tracker to use and whether it may co
 |---|---|
 | `/adlc-3d:build <idea>` | Start a new application, or resume an iteration that is in progress |
 | `/adlc-3d:change <request>` | Start a new iteration on an existing app from a change request, bug, performance problem or backlog item. It analyses the impact and runs only the phases the change needs |
+| `/adlc-3d:incident <what is happening>` | Handle a production fault: record and triage it, mitigate with your approval for every rollback or deploy, fix it in a hotfix iteration, and write the postmortem |
 | `/adlc-3d:status` | See the current iteration and phase, approvals, open questions, bugs, what is not verified and the next step. Read-only |
 
 The lifecycle state is kept in `docs/project-status.md`, so a new session picks up where the last one stopped.
@@ -79,6 +80,7 @@ The lifecycle state is kept in `docs/project-status.md`, so a new session picks 
 | qa-engineer | End-to-end, visual regression and cross-browser tests |
 | devops-engineer | Pipeline and hosting configuration |
 | code-reviewer | Reviews every change line by line before it is tested; never edits code |
+| security-engineer | Threat model at design, security review before release, when security is affected; never edits code |
 
 Each agent can also be used on its own for work in its area.
 
@@ -161,6 +163,15 @@ Only Slack incoming webhooks (`hooks.slack.com`) and Teams Workflows hosts are a
 - The person whose token the tracker uses cannot be an approver, because the tracker posts as them. Use a dedicated ClickUp user for the token if you want to approve in ClickUp yourself
 - Approval with changes, a decision on work that changed after the request, and disagreeing approvers all come back to you in chat. Exceptions, pushes, merges and deploys are always chat only
 
+## Releases, environments and incidents
+
+From 4.2.0:
+
+- **Release versions.** Each release gets a semantic version (patch for a fix, minor for a feature, major for a breaking change), agreed at the release approval and kept in `docs/project-status.md`. In ClickUp it is a Milestone card `REL-<version>` with its cards tagged `release-<version>`; the changelog entry is drafted from the documents
+- **Environments and UAT.** The pipeline has preview, staging and production. After you merge, the Tech Lead deploys to staging with your approval, QA checks the staging build, and you sign off UAT (or a named UAT approver does in ClickUp, for that exact build). Production gets the build UAT approved, on a separate approval, then the release is tagged. A rollback section in `docs/deployment.md` says how to put the last good release back
+- **Security engineer.** Threat models the design and reviews security before release whenever auth, uploads, data, headers, dependencies or third-party hosts change, and always for a new app
+- **Incidents.** `/adlc-3d:incident` records the fault in `docs/incidents/INC-<n>.md`, triages severity (sev1 and sev2 always stop for you), mitigates with your approval for each rollback or deploy, fixes the cause in a hotfix iteration that pauses any open one, and ends with a blameless postmortem whose actions go to the backlog
+
 ## Branches and pull requests
 
 If you agree to commits at the start, the Tech Lead:
@@ -183,6 +194,8 @@ Alongside the application code, each project gets:
 | `docs/design-spec.md` | Design specification |
 | `docs/performance.md`, `docs/qa-report.md` | Measurements and test results |
 | `docs/review.md`, `docs/code-review.md` | The architect's release review and the code review of each iteration |
+| `docs/security/` | Threat model and security review |
+| `docs/incidents/` | Production incidents and their postmortems |
 | `docs/tracker/` | Tracker settings, the card registry and `board.md`, if you chose a tracker |
 | `docs/lifecycle/` | Traceability matrix, release readiness report, retrospective |
 | `docs/deployment.md`, `CHANGELOG.md` | Hosting, pipeline, manual steps and release history |

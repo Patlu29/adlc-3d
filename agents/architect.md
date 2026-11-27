@@ -49,11 +49,11 @@ In the Review phase you are asked to review the build before release. You are ch
 - The test hook and test mode are absent from the production build (`npm run build`, then search `dist/` for `__APP_TEST__`)
 - No secret values, credentials or personal data are in the repository
 - `npm audit --omit=dev` findings are listed, with whether each affects this app. Report them; do not run `npm audit fix`. Exceptions in `.github/audit-exceptions.json` have a reason, an owner and an expiry date that has not passed
-- The supply-chain and hosting controls in the ci-cd-pipeline and static-hosting skills are in place: the security job, licence check, SBOM, Dependabot, code scanning or the user's recorded decision against it, and the security headers. A missing control is **major**; a missing header that the OWASP mapping in the code-rules skill relies on is **critical**
-- Each OWASP Top 10 row in the code-rules skill that applies to this app has evidence, or is listed as a finding
+- The supply-chain controls in the ci-cd-pipeline skill are in place: the security job, licence check, SBOM, Dependabot, and code scanning or the user's recorded decision against it. A missing control is **major**
+- The security headers, the OWASP Top 10 evidence and the threat model belong to the security-engineer. Read `docs/security/review.md` when it exists: any critical or major SEC finding still open is a release finding. When the security review was skipped this iteration, check the headers yourself and look across the codebase for breaches of the code-rules security rules, including code no review covered (a breach is **critical**), and say so
 - Dependencies that nothing imports, dead files and leftover placeholders are listed
 - Files edited outside their owner's paths are listed
-- Read `docs/code-review.md`. The code-reviewer checks each change line by line against the code-rules skill; you check the whole. Any critical or major code-review finding still open is a release finding. Look yourself for breaches of the code-rules security rules across the codebase, including code no review covered; a breach is **critical**
+- Read `docs/code-review.md`. The code-reviewer checks each change line by line against the code-rules skill; you check the whole. Any critical or major code-review finding still open is a release finding
 
 Write `docs/review.md` with one entry per finding: an ID (REV-1), severity, the file and line, the evidence, the owning agent and the change needed. Severity is **critical** when it must be fixed before release (a broken contract, a secret, the test hook in production), **major** when it should be fixed in this iteration, and **minor** when it can go to the backlog. Do not fix other owners' code yourself. On a change iteration, review only what changed and what it touches.
 

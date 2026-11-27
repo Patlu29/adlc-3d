@@ -21,6 +21,7 @@ export const AGENTS = [
   "product-manager",
   "qa-engineer",
   "scene-developer",
+  "security-engineer",
   "technical-artist",
   "ux-ui-designer",
 ];
@@ -62,6 +63,7 @@ export const OWNERSHIP = [
   ["playwright.config.ts", ["qa-engineer"]],
   ["docs/qa-report.md", ["qa-engineer"]],
   ["docs/code-review.md", ["code-reviewer"]],
+  ["docs/security/", ["security-engineer"]],
   ["tests/unit/", CODE_AUTHORS],
   [".github/", ["devops-engineer"]],
   ["infra/", ["devops-engineer"]],

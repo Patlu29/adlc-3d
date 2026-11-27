@@ -15,11 +15,11 @@ The team works in the Agentic Development Life Cycle. Work moves through seven p
 | # | Phase | Agents | Ends with |
 |---|---|---|---|
 | 1 | Plan | product-manager | The user approves the scope |
-| 2 | Design | architect, ux-ui-designer | The user approves the design |
+| 2 | Design | architect, security-engineer when security is affected, ux-ui-designer | The user approves the design |
 | 3 | Build | technical-artist, scene-developer, frontend-developer, backend-developer, code-reviewer, qa-engineer for the smoke test | Checks pass, no critical or major code-review finding is open, and the smoke test passes |
 | 4 | Verify | performance-optimiser, qa-engineer | Every criterion in scope has a result |
-| 5 | Review | architect, code-reviewer for late changes, the Tech Lead | The user approves the release |
-| 6 | Release | devops-engineer | The pipeline and hosting config are ready |
+| 5 | Review | architect, security-engineer when security is affected, code-reviewer for late changes, the Tech Lead | The user approves the release |
+| 6 | Release | devops-engineer, qa-engineer for the staging check | 6a: the pipeline and hosting config are ready. 6b, after the merge and only if the user wants it deployed: staging checked, UAT signed off, production deployed |
 | 7 | Operate and learn | the Tech Lead, product-manager, qa-engineer if deployed | The retrospective and backlog are updated |
 
 What this means for you:
@@ -45,10 +45,11 @@ What this means for you:
 | `docs/performance.md` | performance-optimiser |
 | `tests/e2e/`, `playwright.config.ts`, `docs/qa-report.md` | qa-engineer |
 | `docs/code-review.md` | code-reviewer |
+| `docs/security/` | security-engineer |
 | `tests/unit/<area>/` | The developer who owns the code under test |
 | `.github/`, `infra/`, hosting config (such as `netlify.toml`, `vercel.json`, `public/_headers` and `public/_redirects`), `docs/deployment.md`, `CHANGELOG.md` | devops-engineer |
 | `docs/handoffs/<agent-name>.md` | That agent |
-| `docs/project-status.md`, `docs/lifecycle/`, `docs/tracker/` | The Tech Lead. Read only for every agent; `docs/tracker/` is written only by the tracker command |
+| `docs/project-status.md`, `docs/lifecycle/`, `docs/tracker/`, `docs/incidents/` | The Tech Lead. Read only for every agent; `docs/tracker/` is written only by the tracker command |
 | `assets/source/` | The user. Read only for every agent |
 
 Only edit paths you own. If a path you don't own needs a change, describe the change under **Requests for other agents** in your handoff note and name the owner. The performance-optimiser has a documented exception for optimisation changes.
@@ -61,7 +62,7 @@ The plugin's hooks act on every file write inside a project that has `docs/proje
 
 | Hook | What it does |
 |---|---|
-| Before a write | Blocks `.env` files that hold values (`.env`, `.env.local`, `.env.production`, `.env.*.local`), generated output (`dist/`, `node_modules/`, test reports), `package-lock.json`, `assets/source/`, agents writing `docs/project-status.md`, `docs/lifecycle/` or `docs/tracker/`, and new content that looks like a credential |
+| Before a write | Blocks `.env` files that hold values (`.env`, `.env.local`, `.env.production`, `.env.*.local`), generated output (`dist/`, `node_modules/`, test reports), `package-lock.json`, `assets/source/`, agents writing `docs/project-status.md`, `docs/lifecycle/`, `docs/tracker/` or `docs/incidents/`, and new content that looks like a credential |
 | After a write | Warns when you edited a path another agent owns, and lists code-rules self-review hits in the file you changed |
 | Before a shell command | Blocks adding or removing ClickUp approvers, calling the ClickUp API directly, and reading the ClickUp token or a webhook URL |
 
@@ -86,6 +87,8 @@ Read the documents your task depends on before you start. Do not rely on memory 
 | `docs/api.md` | Backend API contract |
 | `docs/review.md` | The architect's release review findings |
 | `docs/code-review.md` | The code reviewer's findings on this iteration's changes |
+| `docs/security/threat-model.md`, `docs/security/review.md` | The threat model and the security review |
+| `docs/incidents/INC-<n>.md` | Each production incident and its postmortem |
 | `docs/tracker/board.md` | The cards and their states, if a tracker is set up |
 | `docs/lifecycle/` | Traceability matrix, release readiness report and retrospective |
 | `docs/handoffs/<agent-name>.md` | Each agent's latest handoff note |

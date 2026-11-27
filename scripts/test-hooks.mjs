@@ -123,6 +123,8 @@ expectGuard("project-status by a short agent name is blocked", write(project, "d
 expectGuard("lifecycle docs by an agent are blocked", write(project, "docs/lifecycle/traceability.md", "x", architect), true);
 expectGuard("project-status by the Tech Lead is allowed", write(project, "docs/project-status.md"), false);
 expectGuard("lifecycle docs by the Tech Lead are allowed", write(project, "docs/lifecycle/retrospective.md"), false);
+expectGuard("incident records by an agent are blocked", write(project, "docs/incidents/INC-1.md", "x", { agent_type: "adlc-3d:qa-engineer" }), true);
+expectGuard("incident records by the Tech Lead are allowed", write(project, "docs/incidents/INC-1.md"), false);
 expectGuard("tracker files by an agent are blocked", write(project, "docs/tracker/board.md", "x", { agent_type: "adlc-3d:code-reviewer" }), true);
 
 // Secrets in new content
@@ -169,6 +171,8 @@ expectReview("another agent's path gets a warning", edit(project, "src/scene/Cam
 expectReview("short agent name is recognised", edit(project, "src/scene/Camera.ts", "frontend-developer"), [["owned by scene-developer", true]]);
 expectReview("the Tech Lead gets no ownership warning", edit(project, "src/scene/Camera.ts"), [["owned by", false]]);
 expectReview("performance-optimiser exception", edit(project, "src/scene/Camera.ts", "adlc-3d:performance-optimiser"), [["owned by", false]]);
+expectReview("security-engineer writing its threat model gets no warning", edit(project, "docs/security/threat-model.md", "adlc-3d:security-engineer"), [["owned by", false]]);
+expectReview("security-engineer editing server code gets a warning", edit(project, "src/scene/Camera.ts", "adlc-3d:security-engineer"), [["owned by scene-developer", true]]);
 expectReview("code-reviewer writing its review gets no warning", edit(project, "docs/code-review.md", "adlc-3d:code-reviewer"), [["owned by", false]]);
 expectReview("code-reviewer editing source gets a warning", edit(project, "src/scene/Camera.ts", "adlc-3d:code-reviewer"), [["owned by scene-developer", true]]);
 expectReview("own handoff note gets no warning", edit(project, "docs/handoffs/qa-engineer.md", "adlc-3d:qa-engineer"), [["owned by", false]]);

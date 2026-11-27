@@ -92,6 +92,20 @@ gh pr view <branch> --json state,mergedAt
 
 Without `gh`, use `git fetch` and then `git branch -r --merged origin/<base branch>`. Once the change is merged, move the iteration's cards to done with the tracker, and record the merge in the state file. If the iteration closes without a merge, say so in the retrospective and leave the cards in ready_for_release.
 
+## Release tags
+
+After a release is deployed to production in phase 6b, tag the merge commit that was deployed with the release version, and push only that tag. Ask the user once, for both, separately from the deploy question:
+
+```bash
+git tag -a v<version> <deployed SHA> -m "Release <version>"
+```
+
+```bash
+git push origin v<version>
+```
+
+Never move or delete a tag that has been pushed. A hotfix for an incident branches from the tag of the release in production.
+
 ## Rules
 
 - Never push, force-push, delete a remote branch, change git configuration or rewrite history without the user's explicit approval for that action
