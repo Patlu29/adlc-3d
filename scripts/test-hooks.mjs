@@ -3,7 +3,7 @@
 // Usage: node scripts/test-hooks.mjs
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -216,6 +216,70 @@ expectBash("outside an ADLC project nothing is blocked", "curl https://api.click
     failures += 1;
     console.error("FAIL: hooks off switches the Bash guard off");
   }
+}
+
+
+// ---------- run log (runs.mjs) ----------
+{
+  const logFile = join(project, "docs", "metrics", "runs.jsonl");
+  const agentCall = (extra = {}) => ({
+    hook_event_name: "PostToolUse",
+    tool_name: "Agent",
+    cwd: join(project, "src"),
+    tool_input: { subagent_type: "adlc-3d:scene-developer", prompt: "Project: secret idea\nIteration and phase: Iteration 2 (Feature: CR-3), phase 3 Build\nCards: US-7 (CU-86abc12), BUG-2\nYour task: build it", run_in_background: false },
+    tool_response: { status: "completed", agentId: "a1", agentType: "adlc-3d:scene-developer", resolvedModel: "claude-opus-5-5", totalDurationMs: 1200, totalTokens: 5000, totalToolUseCount: 4, usage: { input_tokens: 10, output_tokens: 20, cache_read_input_tokens: 30, cache_creation_input_tokens: 40 }, content: [{ type: "text", text: "private reply" }] },
+    ...extra,
+  });
+  const lines = () => { try { return readFileSync(logFile, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; } };
+  const check = (cond, name) => { count += 1; if (!cond) { failures += 1; console.error(`FAIL: ${name}`); } };
+
+  let r = run("runs.mjs", agentCall());
+  const first = lines()[0] || {};
+  check(r.code === 0 && r.out === "", "the run log prints nothing and exits 0");
+  check(first.event === "run" && first.agent === "scene-developer" && first.tokens === 5000 && first.toolUses === 4 && first.iteration === 2 && first.phase === "3", "a foreground run is logged with its totals, iteration and phase");
+  check(JSON.stringify(first.cards) === JSON.stringify(["US-7", "BUG-2"]), "card IDs come from the Cards line, without ClickUp keys");
+  check(first.schemaVersion === 1 && typeof first.plugin === "string" && first.plugin.length > 0, "each line carries the schema and plugin version");
+  check(!readFileSync(logFile, "utf8").includes("secret idea") && !readFileSync(logFile, "utf8").includes("private reply"), "neither the prompt nor the reply is stored");
+  run("runs.mjs", { hook_event_name: "SubagentStop", cwd: project, agent_id: "a1", agent_type: "adlc-3d:scene-developer", last_assistant_message: "private reply" });
+  check(lines().length === 2 && lines()[1].event === "stop" && !readFileSync(logFile, "utf8").includes("private reply"), "SubagentStop appends a stop event without the reply");
+  run("runs.mjs", agentCall({ tool_input: { subagent_type: "general-purpose", prompt: "x" }, tool_response: { status: "completed", agentType: "general-purpose" } }));
+  run("runs.mjs", { hook_event_name: "SubagentStop", cwd: project, agent_id: "z", agent_type: "Explore" });
+  check(lines().length === 2, "agents from outside the plugin are not logged");
+  run("runs.mjs", agentCall({ cwd: plain }));
+  check(!existsSync(join(plain, "docs", "metrics")), "nothing is logged outside an ADLC project");
+  run("runs.mjs", agentCall({ cwd: offProject }));
+  check(!existsSync(join(offProject, "docs", "metrics")), "Hooks: off switches the run log off");
+  const metricsOff = join(work, "metrics-off");
+  file(join(metricsOff, "docs", "project-status.md"), "# Project status\n\nMetrics: off\n");
+  run("runs.mjs", agentCall({ cwd: metricsOff }));
+  check(!existsSync(join(metricsOff, "docs", "metrics")), "Metrics: off switches the run log off");
+  for (const bad of ["not json", "null", "{}", JSON.stringify({ hook_event_name: "PostToolUse", tool_name: "Agent", cwd: project, tool_input: 5, tool_response: "x" })]) {
+    r = run("runs.mjs", bad);
+    check(r.code === 0 && r.out === "", `malformed input exits 0 silently: ${bad.slice(0, 20)}`);
+  }
+  check(lines().length === 2, "malformed input logs nothing");
+  r = run("runs.mjs", agentCall({ tool_response: { status: "async_launched", agentId: "b1" }, tool_input: { subagent_type: "adlc-3d:qa-engineer", prompt: "Cards: US-1", run_in_background: true } }));
+  const bg = lines()[2] || {};
+  check(bg.background === true && bg.tokens === null && bg.agent === "qa-engineer", "a background launch is logged with unknown totals");
+  run("runs.mjs", agentCall({ tool_input: { subagent_type: "adlc-3d:devops-engineer", prompt: "Iteration and phase: Iteration 3, phase 10\nCards: REL-1.1.0, US-4, BUG-2." } }));
+  const rel = lines()[3] || {};
+  check(JSON.stringify(rel.cards) === '["US-4","BUG-2"]' && rel.phase === null, "release versions are not card IDs, and phase 10 is not phase 1");
+
+  // A cloned project cannot point the log at a file elsewhere.
+  const linked = join(work, "linked");
+  const outside = join(work, "outside.txt");
+  file(join(linked, "docs", "project-status.md"), "# Project status\n");
+  file(outside, "keep\n");
+  mkdirSync(join(linked, "docs", "metrics"), { recursive: true });
+  symlinkSync(outside, join(linked, "docs", "metrics", "runs.jsonl"));
+  r = run("runs.mjs", agentCall({ cwd: linked }));
+  check(r.code === 0 && readFileSync(outside, "utf8") === "keep\n", "the run log never follows a linked log file");
+  const linkedDir = join(work, "linked-dir");
+  file(join(linkedDir, "docs", "project-status.md"), "# Project status\n");
+  mkdirSync(join(work, "elsewhere"), { recursive: true });
+  symlinkSync(join(work, "elsewhere"), join(linkedDir, "docs", "metrics"));
+  run("runs.mjs", agentCall({ cwd: linkedDir }));
+  check(!existsSync(join(work, "elsewhere", "runs.jsonl")), "the run log never follows a linked metrics folder");
 }
 
 rmSync(work, { recursive: true, force: true });

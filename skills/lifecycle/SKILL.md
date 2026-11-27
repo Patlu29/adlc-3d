@@ -33,7 +33,7 @@ The ADLC is a software development life cycle run by a team of agents and steere
 | 4 | Verify | performance-optimiser, qa-engineer | The smoke test passes | `docs/performance.md`, `tests/e2e/`, `docs/qa-report.md` | Every criterion in scope has a result; no critical or major bug is open, unless the user accepted it as a known issue; every figure says how it was measured | Automatic |
 | 5 | Review | architect, security-engineer when security is affected, code-reviewer for code changed since its last review, the Tech Lead | Verify has exited | `docs/review.md`, `docs/security/review.md`, `docs/code-review.md`, `docs/lifecycle/traceability.md`, `docs/lifecycle/release-readiness.md` | No critical review or security finding is open, and every major security finding is fixed or accepted by the user; the code review covers the last code change; the test results are from after the last code change; the traceability matrix has no unexplained gap | **Approval A3: release** |
 | 6 | Release | devops-engineer, qa-engineer for the staging check | 6a Prepare: A3 approved (on the Operations route, the change is prepared first and A3 approves it). 6b Deploy: the change is merged and the user wants it deployed | 6a: `.github/` workflows, hosting config, `docs/deployment.md` with environments and rollback, `CHANGELOG.md`. 6b: the staging check in `docs/qa-report.md`, the release record | 6a: the pipeline runs the scripts that pass locally; no secret is in any file; manual steps and rollback are listed. 6b: staging passes the deployed check, UAT is signed off, production is deployed and checked | 6a automatic. 6b: **Approval UAT**, and every deploy needs its own explicit approval |
-| 7 | Operate and learn | the Tech Lead, product-manager, qa-engineer if deployed | Release has exited | `docs/lifecycle/retrospective.md`, updated `backlog.md` | The retrospective is written; every known gap is a backlog item; the iteration is closed in the state file | Automatic |
+| 7 | Operate and learn | the Tech Lead, product-manager, qa-engineer if deployed | Release has exited | `docs/lifecycle/retrospective.md`, updated `backlog.md`, `docs/metrics/report.md` | The retrospective is written; every known gap is a backlog item; the metrics report is regenerated; the iteration is closed in the state file | Automatic |
 
 A phase that an iteration does not need is recorded as **Skipped** with the reason. It is never left blank.
 
@@ -93,9 +93,21 @@ Each approval summary contains: what was produced, what was verified and how, wh
 |---|---|
 | Key gates (default) | A1 scope, A2 design, A3 release, and UAT before a production deploy |
 | Every phase | The exit of all seven phases, and UAT before a production deploy |
-| Autonomous | Only UAT before a production deploy. Otherwise the team stops only when blocked, and reports at the end |
+| Autonomous | Only UAT before a production deploy, and the floors below. Otherwise the team stops only when blocked, and reports at the end |
 
-Use key gates unless the user asks for another mode, and record the mode in the state file. In every mode, deploying, pushing, creating cloud resources or spending money needs the user's explicit approval for that action. An approval recorded in the state file covers only the artefacts it names; if those change materially afterwards, ask again.
+Use key gates unless the user asks for another mode, and record the mode in the state file.
+
+**Autonomy by iteration type.** The user may set a different mode for some iteration types, recorded as `Autonomy: Bug fix=Autonomous, Operations=Every phase, approved by the user on <date>`. A type not listed uses `Approval mode:`. Only the user sets or changes this line; never change it because the metrics look good. The Tech Lead applies it when an iteration opens, never part way through one, and says in the iteration's first message which mode applies and why.
+
+These floors stop for the user in every approval mode, whether it comes from `Approval mode:` or from `Autonomy:`:
+
+- Choosing an iteration's type when it is not obvious, and changing the type of an open iteration. A feature is never labelled a bug fix to reach a lighter mode
+- A Bug fix whose route needs phase 1 or 2 (the criterion or the design was wrong) runs in the default `Approval mode:`
+- Incident iterations never run Autonomous: sev1 and sev2 stop for the user at once, and the hotfix needs A3
+- A change to authentication, secrets handling, dependencies, data migrations or `.github/`, and any security-engineer finding, whatever its severity
+- The exception rule above, a do not release recommendation, UAT, and every deploy, push, merge, tag, cloud resource or spend
+
+After a sev1 or sev2 incident caused by a release, every type that was lighter than Key gates goes back to Key gates until the user sets it again; tell the user and record it under Decisions. In every mode, deploying, pushing, creating cloud resources or spending money needs the user's explicit approval for that action. An approval recorded in the state file covers only the artefacts it names; if those change materially afterwards, ask again.
 
 ## Iterations
 
@@ -137,6 +149,7 @@ Base: main at 4f2c9a1
 Sprint: 2, "Share the current view", 2026-11-11 to 2026-11-22, capacity 13 pts
 Notify: slack, approved by the user on 2026-11-02
 ClickUp approvals: on (approvers alex, sam), approved by the user on 2026-11-02
+Autonomy: Bug fix=Autonomous, approved by the user on 2026-11-02
 Release: 1.3.0 (awaiting merge and deploy)
 
 ## Iterations
@@ -166,6 +179,8 @@ Release: 1.3.0 (awaiting merge and deploy)
 ```
 
 **A paused iteration.** When an incident pauses the open iteration, move its header lines (`Current iteration`, `Current phase`, `Branch`, `Base`, `Sprint`, `Release`) and its phase log, unchanged, into a section `## Paused for INC-<n>` at the end of the file, then open the hotfix iteration in their place. On resume, after the hotfix iteration has closed, move them back and delete the section. Only one iteration is ever paused.
+
+The Decision column of Approvals uses exactly `Approved`, `Approved with changes` or `Rejected: <reason>`, one row per decision, so a rejected gate keeps its row when it is later approved. The metrics report counts first-time approvals from these words. `Metrics: off` stops the agent run log for this project.
 
 `Tracker:` is `clickup (...)`, `local` or `none`; a state file without the line means none. `Git:` is the commit consent or `none`. `Branch:` and `Base:` are set when the iteration opens.
 
@@ -237,6 +252,13 @@ Done means: <the exit criteria this task serves, the checks that must pass and t
 - Give each agent only its own work; do not ask an agent to edit paths it does not own
 - Quote requests, review findings and bug reports in full instead of summarising them
 - For a fix, include the reproduction steps and the failing check
+- Keep the `Iteration and phase:` and `Cards:` lines in exactly this form. The plugin's run log reads them to file each agent run under its iteration, phase and cards
+
+## Metrics
+
+The plugin's run log hook records every delegation to one of this plugin's agents in `docs/metrics/runs.jsonl`: the agent, the cards, iteration and phase from the delegation prompt, the model, tokens, time and tool uses as Claude Code reports them. It never records the prompt or the reply. Nothing needs to be done to keep it; `Metrics: off` in the state file stops it.
+
+In phase 7, run `node "${CLAUDE_PLUGIN_ROOT}/tracker/cli.mjs" metrics`, which needs no tracker, and add three lines from `docs/metrics/report.md` to the retrospective: cycle time, gate decisions approved at the first answer, and agent runs and tokens for this iteration. Report what the figures say and how many items they rest on; do not draw a trend from fewer than five releases or iterations. The architect's scaffold adds `docs/metrics/runs.jsonl merge=union` to `.gitattributes`, so parallel branches do not conflict on the log. When an incident's postmortem finds the release that caused it, record it as `Introduced in:` in the incident file; the change failure rate uses that line.
 
 ## The check after every delegation
 

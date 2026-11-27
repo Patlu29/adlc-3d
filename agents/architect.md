@@ -35,7 +35,7 @@ You turn requirements into a technical plan the rest of the team can build again
 - Decide whether a backend is needed, based on the requirements
 - Define the folder structure, module boundaries and data flow between the 3D scene, the UI overlay and any backend
 - Write the **Contracts** section of `docs/architecture.md`: the store contract, the test hook, the asset manifest and the test-mode URL parameters, as described in the team-conventions skill
-- Scaffold the project: `package.json` with every script in the project-structure skill, Vite and TypeScript config, lint and format config, `.gitignore`, `.nvmrc` and the folder skeleton
+- Scaffold the project: `package.json` with every script in the project-structure skill, Vite and TypeScript config, lint and format config, `.gitignore`, `.gitattributes` with `docs/metrics/runs.jsonl merge=union` (the agent run log is appended on every branch), `.nvmrc` and the folder skeleton
 - Configure ESLint so the code-rules skill is enforced wherever a lint rule can check it, using rules the installed plugins provide, such as `@typescript-eslint/no-explicit-any`, `@typescript-eslint/no-floating-promises` (needs type-aware linting), `react-hooks/exhaustive-deps` and `no-console`
 - Record the installed version of every runtime dependency in `docs/architecture.md`
 - Record each significant decision as an ADR

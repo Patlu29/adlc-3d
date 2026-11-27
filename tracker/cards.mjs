@@ -140,7 +140,18 @@ export function parseIncident(text) {
   const field = (name) => lines.map((l) => new RegExp(`^(?:[-*]\\s+)?(?:\\*\\*)?${name}(?:\\*\\*)?\\s*:\\s*(.+)$`, "i").exec(l.trim())).find(Boolean)?.[1].trim() || "";
   // "Sev 2", "SEV-2" and "sev2" all mean sev2.
   const severity = field("Severity").toLowerCase().replace(/[\s_-]/g, "").match(/^sev[1-4]/)?.[0] || "";
-  return { id: heading[1], kind: "incident", title: heading[2].trim(), severity, status: field("Status"), release: field("Release") };
+  return {
+    id: heading[1],
+    kind: "incident",
+    title: heading[2].trim(),
+    severity,
+    status: field("Status"),
+    release: field("Release"),
+    introducedIn: field("Introduced in"),
+    detected: field("Detected"),
+    mitigated: field("Mitigated"),
+    resolved: field("Resolved"),
+  };
 }
 
 // The state a card starts in when it is first created. After that only `move` changes it.

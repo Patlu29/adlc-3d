@@ -3,7 +3,7 @@
 // Run from the project root, or pass --project <dir>. See skills/card-tracking/SKILL.md.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SECRET_ENV, findSecret } from "../hooks/lib.mjs";
@@ -12,6 +12,7 @@ import { TrackerError, createClient } from "./clickup.mjs";
 import { createHash } from "node:crypto";
 import { CHANNELS, sendNotifications } from "./notify.mjs";
 import { COMPLETED, isDate, localDate, renderSprintReport, velocity } from "./sprints.mjs";
+import { parseRuns, mergeRuns, renderMetrics } from "./metrics.mjs";
 import { acquireLock, loadState, readJson, releaseLock, renderBoard, trackerPaths, writeJsonAtomic } from "./store.mjs";
 
 const EXIT = { ok: 0, usage: 1, user: 2, queued: 3, locked: 4, pending: 5, notReady: 6 };
@@ -51,6 +52,7 @@ const USAGE = `adlc-3d tracker
   release ship --version <x.y.z> [--date <YYYY-MM-DD>]
   approvers list                      approvers add|remove are for the user, in their own terminal
   secrets --staged                    Scan staged git changes for credentials
+  metrics [--print]                   Delivery metrics and agent runs to docs/metrics/report.md (no tracker needed)
 
 States: ${STATES.join(", ")}
 Exit codes: 0 done, 1 usage or input error, 2 needs the user (token, List, statuses, a decision),
@@ -362,7 +364,7 @@ async function cmdMove(ctx, { positional, flags }) {
         else say(`  ${id}: no ClickUp status is mapped to ${target}, so only the local record changed`);
       }
       // A card from before 4.1 has no history: record its earlier state as the starting point.
-      if (!entry.history?.length) entry.history = [{ state: entry.state, at: new Date(0).toISOString() }];
+      if (!entry.history?.length) entry.history = [{ state: entry.state, at: new Date(0).toISOString(), synthetic: true }];
       if (entry.state !== target) entry.history.push({ state: target, at });
       entry.state = target;
       if (flags.note) await postNote(ctx, entry, id, flags.note);
@@ -556,6 +558,36 @@ function cmdReady(ctx, { flags }) {
   return failing && wanted.length ? EXIT.notReady : EXIT.ok;
 }
 
+// Read only on the tracker: built from local records, so it works with ClickUp, local or no tracker.
+function cmdMetrics(ctx, { flags }) {
+  const read = (rel) => (existsSync(join(ctx.root, rel)) ? readFileSync(join(ctx.root, rel), "utf8") : "");
+  const state = ctx.config ? loadState(ctx.paths) : { cards: {}, pending: [] };
+  const metricsDir = join(ctx.root, "docs", "metrics");
+  // The current log and any rotated ones (runs-<date>.jsonl).
+  const logs = existsSync(metricsDir) ? readdirSync(metricsDir).filter((f) => /^runs(-[\dT-]+)?\.jsonl$/.test(f)).sort() : [];
+  const parsed = parseRuns(logs.map((f) => readFileSync(join(metricsDir, f), "utf8")).join("\n"));
+  const text = renderMetrics({
+    today: localDate(Date.now()),
+    tracker: Boolean(ctx.config),
+    cards: state.cards,
+    sprints: state.sprints,
+    releases: state.releases,
+    incidents: readIncidents(ctx.root),
+    statusText: read("docs/project-status.md"),
+    bugList: parseBugs(read("docs/qa-report.md")),
+    runs: mergeRuns(parsed.events),
+    badRunLines: parsed.bad,
+  });
+  if (flags.print) {
+    say(text);
+    return EXIT.ok;
+  }
+  mkdirSync(metricsDir, { recursive: true });
+  writeFileSync(join(metricsDir, "report.md"), `${text}\n`);
+  say(`Metrics written to docs/metrics/report.md (${mergeRuns(parsed.events).length} agent run(s) logged).`);
+  return EXIT.ok;
+}
+
 function cmdSecrets({ flags, root }) {
   if (!flags.staged) throw new UsageError("secrets needs --staged");
   const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
@@ -692,7 +724,7 @@ async function sprintStart(ctx, flags) {
   ctx.state.activeSprint = number;
   for (const id of ids) {
     const entry = ctx.state.cards[id];
-    if (!entry.history?.length) entry.history = [{ state: entry.state, at: sprint.startedAt }];
+    if (!entry.history?.length) entry.history = [{ state: entry.state, at: sprint.startedAt, synthetic: true }];
   }
   save(ctx);
   const committedPoints = Object.values(sprint.committed).reduce((a, b) => a + b, 0);
@@ -719,7 +751,7 @@ async function sprintChange(ctx, flags, change) {
   const at = flags.at && !Number.isNaN(Date.parse(flags.at)) ? flags.at : new Date().toISOString();
   for (const id of ids) {
     const entry = ctx.state.cards[id];
-    if (!entry.history?.length) entry.history = [{ state: entry.state, at }];
+    if (!entry.history?.length) entry.history = [{ state: entry.state, at, synthetic: true }];
     const inScope = sprint.tagged.includes(id);
     if ((change === "add") === inScope) continue;
     try {
@@ -926,7 +958,7 @@ function fingerprint(root) {
   try {
     const files = execFileSync(
       "git",
-      ["--no-optional-locks", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", ".", ":(exclude)docs/tracker", ":(exclude)docs/project-status.md"],
+      ["--no-optional-locks", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", ".", ":(exclude)docs/tracker", ":(exclude)docs/metrics", ":(exclude)docs/project-status.md"],
       { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 }
     ).split("\0").filter(Boolean).sort();
     const hash = createHash("sha256");
@@ -1198,6 +1230,7 @@ export async function main(argv) {
     if (parsed.command === "notify") return await cmdNotify(ctx, parsed);
     if (parsed.command === "approvers") return await cmdApprovers(ctx, parsed);
     if (parsed.command === "ready") return cmdReady(ctx, parsed);
+    if (parsed.command === "metrics") return cmdMetrics(ctx, parsed);
     if (parsed.command === "init") return await cmdInit(ctx, parsed);
     if (parsed.command === "check") return await cmdCheck(ctx, parsed);
     if (parsed.command === "board") return await cmdBoard(ctx, parsed);

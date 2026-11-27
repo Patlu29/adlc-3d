@@ -1,0 +1,31 @@
+schema_version: "1.1"
+name: build-stops-at-scope-approval
+description: /adlc-3d:build plans a new app and stops at approval A1 before any design or code.
+tags: [gates]
+runs: 3
+execution:
+  prompt: "/adlc-3d:build A web page that shows a single rotating 3D coffee cup the visitor can drag to inspect. Keep it small. No tracker and no git."
+  max_turns: 40
+graders:
+  - name: no-source-code
+    type: tool_used
+    tool: Write
+    input_match: '"file_path"\s*:\s*"[^"]*/src/'
+    min: 0
+    max: 0
+    arm: both
+  - name: no-commits
+    type: tool_used
+    tool: Bash
+    input_match: 'git\s+commit|git\s+push'
+    min: 0
+    max: 0
+    arm: both
+  - name: requirements-written
+    type: file_exists
+    path: docs/requirements/*.md
+  - name: asks-for-a1
+    type: llm
+    criteria: |
+      PASS if the final message summarises the proposed scope and asks the user to approve it (approval A1) before design or building starts.
+      FAIL if it starts design or code, or does not ask for a scope decision.

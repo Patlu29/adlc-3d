@@ -25,6 +25,9 @@ Severity: sev2
 Status: open
 Release: 1.3.0
 Detected: 2026-11-25 14:05 AEDT, reported by the user
+Mitigated:
+Resolved:
+Introduced in:
 Impact: <who is affected, what they cannot do, since when>
 
 ## Timeline
@@ -34,7 +37,7 @@ Impact: <who is affected, what they cannot do, since when>
 ## Actions
 ```
 
-Record facts and times as they happen. Never paste credentials, personal data or raw logs into the file or a card; summarise them and say where the evidence is.
+Record facts and times as they happen. Fill `Mitigated:` and `Resolved:` with the date and time when the status changes, in the same time zone as `Detected:`; the metrics report takes time to restore from them. `Introduced in:` is the release whose change caused the fault, set in the postmortem once the root cause is known (it may differ from `Release:`, which is what was in production when the fault was found); leave it empty if no release caused it. Never paste credentials, personal data or raw logs into the file or a card; summarise them and say where the evidence is.
 
 ## 2. Triage
 
@@ -55,7 +58,7 @@ Contain the damage before fixing the cause. Offer the user the options with your
 - **Fix forward**, when a rollback is not possible. A fix forward is still a code change: it goes through the code-reviewer and the full end-to-end suite, and the user approves it like a release, before it is deployed. If that takes too long, roll back or switch the feature off first
 - **Switch off** the failing feature, if the app has a setting for it
 
-Every rollback, deploy, redeploy or change to production needs the user's explicit approval for that action, asked for at the time. An approval given earlier, in this incident or another, does not carry over. After any change to production, have the qa-engineer run the deployed spec against production and record the result in the timeline. Set `Status: mitigated` once users are no longer affected.
+Every rollback, deploy, redeploy or change to production needs the user's explicit approval for that action, asked for at the time. An approval given earlier, in this incident or another, does not carry over. After any change to production, have the qa-engineer run the deployed spec against production and record the result in the timeline. Set `Status: mitigated` and fill `Mitigated:` once users are no longer affected.
 
 ## 4. Track and tell
 
@@ -67,7 +70,7 @@ Every rollback, deploy, redeploy or change to production needs the user's explic
 1. If an iteration is open, pause it: move its lines and phase log into a `## Paused for INC-<n>` section of the state file, as the lifecycle skill describes, run `sprint pause --reason INC-<n>` with a tracker, and commit its current work on its branch if commits are on. Never discard or stash the user's work without asking.
 2. With commits on, branch from the release in production (the tag `v<version>`, or the base branch if there is no tag), named `fix/INC-<n>-<slug>`. Deploy it from that branch by SHA, as the ci-cd-pipeline skill describes, so unreleased work on the base branch does not go out with it, and merge it back once it is in production.
 3. Run a Bug fix iteration on the route in the lifecycle skill: the owning agent fixes it, the code-reviewer reviews it, the qa-engineer adds a regression test that fails without the fix and runs the full suite, then Review, approval A3, Release and the deploy steps, each deploy on its own approval. Involve the security-engineer for a security fault.
-4. When it is released, set `Status: resolved`. Once the hotfix iteration has closed (phase 7, and `sprint close`), resume the paused iteration from its recorded phase: move its lines back as the lifecycle skill describes, and run `sprint resume --number <n>` with a tracker.
+4. When it is released, set `Status: resolved` and fill `Resolved:`. After a sev1 or sev2 caused by a release, reset any `Autonomy:` entry lighter than Key gates as the lifecycle skill describes. Once the hotfix iteration has closed (phase 7, and `sprint close`), resume the paused iteration from its recorded phase: move its lines back as the lifecycle skill describes, and run `sprint resume --number <n>` with a tracker.
 
 ## 6. Postmortem
 
@@ -75,7 +78,7 @@ Within the incident file, write:
 
 - **Summary** and **Impact**, in figures: users or sessions affected, duration
 - **Timeline**, with absolute times
-- **Root cause**, and the phase that let it through: which gate, test or review should have caught it, and why it did not
+- **Root cause**, and the phase that let it through: which gate, test or review should have caught it, and why it did not. Set `Introduced in:` to the release that carried the fault
 - **What went well** and **what did not**
 - **Actions**: each one a backlog item with an ID, added by the product-manager. Lessons for the team go into the skill that should have prevented the fault, through a change to this plugin if needed
 
