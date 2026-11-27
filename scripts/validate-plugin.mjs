@@ -229,11 +229,33 @@ if (existsSync(join(root, "hooks/lib.mjs"))) {
 }
 
 // The tracker command that the card-tracking and git-flow skills run.
-for (const file of ["tracker/cli.mjs", "tracker/cards.mjs", "tracker/clickup.mjs", "tracker/store.mjs", "tracker/notify.mjs", "tracker/sprints.mjs"])
+for (const file of ["tracker/cli.mjs", "tracker/cards.mjs", "tracker/clickup.mjs", "tracker/store.mjs", "tracker/notify.mjs", "tracker/sprints.mjs", "tracker/metrics.mjs", "hooks/runs.mjs"])
   if (!existsSync(join(root, file))) fail(file, "missing; the card-tracking skill runs it");
 for (const { path, body } of skills.values()) {
   for (const [, file] of body.matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s`]+)/g))
     if (!existsSync(join(root, file))) fail(path, `runs \${CLAUDE_PLUGIN_ROOT}/${file}, which does not exist`);
+}
+
+// Behaviour eval cases for `claude plugin eval`. A light check of the fields the runner needs,
+// without a YAML parser: schema, a name matching the folder, a prompt, graders and the scaffold file.
+const evalsDir = join(root, "evals");
+if (existsSync(evalsDir)) {
+  let cases = 0;
+  for (const name of readdirSync(evalsDir)) {
+    const caseFile = join(evalsDir, name, "case.yaml");
+    if (!existsSync(caseFile)) continue;
+    cases += 1;
+    const text = readFileSync(caseFile, "utf8");
+    const rel = `evals/${name}/case.yaml`;
+    if (!/^schema_version:\s*"1\.1"\s*$/m.test(text)) fail(rel, 'needs schema_version: "1.1"');
+    if (!new RegExp(`^name:\\s*${name}\\s*$`, "m").test(text)) fail(rel, `name must be ${name}, the folder name`);
+    if (!/^\s+prompt:\s*\S/m.test(text)) fail(rel, "has no execution prompt");
+    if (!/^graders:\s*$/m.test(text) || !/^\s+-\s+name:/m.test(text)) fail(rel, "has no graders");
+    const scaffold = /^\s+scaffold_script:\s*(\S+)/m.exec(text);
+    if (scaffold && !existsSync(join(evalsDir, name, scaffold[1]))) fail(rel, `scaffold_script ${scaffold[1]} does not exist`);
+    for (const m of text.matchAll(/\/adlc-3d:([\w-]+)/g)) if (!skills.has(m[1])) fail(rel, `prompt uses /adlc-3d:${m[1]}, which is not a skill`);
+  }
+  if (!cases) fail("evals/", "has no case.yaml");
 }
 
 // Governance files a corporate review expects.

@@ -675,6 +675,10 @@ try {
     execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "tracker files"], { cwd: sp });
     r = await run(sp, ["gate", "status", "--gate", "A3"]);
     ok(!/Stale/.test(r.out), "committing unchanged work does not make an approval stale", r.out);
+    mkdirSync(join(sp, "docs", "metrics"), { recursive: true });
+    writeFileSync(join(sp, "docs", "metrics", "runs.jsonl"), '{"event":"run","agent":"qa-engineer"}\n');
+    r = await run(sp, ["gate", "status", "--gate", "A3"]);
+    ok(!/Stale/.test(r.out), "an agent run logged while a gate waits does not make the approval stale", r.out);
     writeFileSync(join(sp, "docs", "notes.md"), "new untracked doc\n");
     r = await run(sp, ["gate", "status", "--gate", "A3"]);
     ok(/Stale/.test(r.out), "a new untracked file makes an approval stale", r.out);
@@ -797,6 +801,100 @@ try {
     // Incident notification
     r = await run(rp, ["notify", "--event", "incident", "--text", "INC-1 sev2: Safari cannot load the model"]);
     ok(r.code === 0 && /No notification channel/.test(r.out), "the incident event is accepted", r.out);
+  }
+
+  // ---------- metrics ----------
+  {
+    const M = await import("../tracker/metrics.mjs");
+    const at = (d, h = 10) => new Date(`${d}T${String(h).padStart(2, "0")}:00:00`).toISOString();
+    const cards = {
+      "US-1": { kind: "story", history: [{ state: "backlog", at: at("2026-10-01") }, { state: "in_progress", at: at("2026-10-03") }, { state: "done", at: at("2026-10-05") }] },
+      "US-2": { kind: "story", history: [{ state: "backlog", at: new Date(0).toISOString(), synthetic: true }, { state: "in_progress", at: at("2026-10-04") }, { state: "ready_for_release", at: at("2026-10-08") }] },
+      "BUG-1": { kind: "bug", history: [{ state: "ready", at: at("2026-10-02") }, { state: "in_progress", at: at("2026-10-02") }] },
+      "IT-1": { kind: "iteration", history: [{ state: "in_progress", at: at("2026-10-01") }, { state: "done", at: at("2026-10-09") }] },
+    };
+    const f = M.flow(cards);
+    ok(f.finished === 2 && f.cycle.n === 2 && f.cycle.median === 2 && f.cycle.p85 === 4, "cycle time uses first in progress to first done, stories and bugs only", JSON.stringify(f));
+    ok(f.lead.n === 2 && f.lead.p85 === 4, "a synthetic first entry is left out of lead time (no 1970 dates)", JSON.stringify(f.lead));
+    ok(M.percentile([1, 2, 3, 4, 100], 50) === 3 && M.percentile([], 50) === null, "percentile is nearest-rank and empty is null");
+
+    const releases = { "1.0.0": { version: "1.0.0", cards: ["US-1"], shipped: "2026-10-06" }, "1.1.0": { version: "1.1.0", cards: ["US-2"], shipped: "2026-10-10" }, "1.2.0": { version: "1.2.0", cards: [], shipped: null } };
+    const incidents = [
+      { id: "INC-1", severity: "sev2", status: "resolved", introducedIn: "v1.1.0", detected: "2026-10-11 09:00 AEDT", mitigated: "2026-10-11 11:30 AEDT" },
+      { id: "INC-2", severity: "sev3", status: "open", introducedIn: "", detected: "2026-10-12", mitigated: "" },
+    ];
+    const d = M.dora({ releases, cards, incidents });
+    ok(d.shipped.length === 2 && !d.ratesShown && d.changeFailureRate === undefined, "below five releases, no rates are shown", JSON.stringify(d));
+    ok(JSON.stringify(d.failedReleases) === '["1.1.0"]' && JSON.stringify(d.unattributed) === '["INC-2"]', "change failure uses Introduced in, with unattributed incidents listed", JSON.stringify(d));
+    ok(d.restore.n === 1 && d.restore.median === 2.5, "time to restore is Detected to Mitigated in hours", JSON.stringify(d.restore));
+    ok(d.toShip[0].n === 1 && d.toShip[0].median > 3, "cycle time to ship runs from in progress to the ship date", JSON.stringify(d.toShip));
+    ok(JSON.stringify(d.openIncidents) === '["INC-2 sev3"]', "unresolved incidents are listed");
+    const dt = M.dora({ releases, cards, incidents: [
+      { id: "INC-3", introducedIn: "v1.0.0 (CR-1)", detected: "2026-10-11 11:50 am AEDT", mitigated: "2026-10-11 2:20 pm AEDT" },
+      { id: "INC-4", introducedIn: "the config change" },
+    ] });
+    ok(JSON.stringify(dt.failedReleases) === '["1.0.0"]' && dt.unmatched.length === 1 && /INC-4/.test(dt.unmatched[0]), "free text after the version is attributed; text with no shipped version is listed", JSON.stringify(dt));
+    ok(dt.restore.median === 2.5, "12-hour times are read", JSON.stringify(dt.restore));
+    const many = Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`1.${n}.0`, { version: `1.${n}.0`, cards: [], shipped: `2026-10-${String(n * 5).padStart(2, "0")}` }]));
+    const d5 = M.dora({ releases: many, cards: {}, incidents: [{ id: "INC-9", introducedIn: "1.2.0" }] });
+    ok(d5.ratesShown && d5.changeFailureRate === 20 && d5.perThirtyDays === 6, "from five releases, rates are shown", JSON.stringify(d5));
+
+    const status = `# Project status
+
+## Iterations
+| # | Type | Scope | Started | Closed | Outcome |
+|---|---|---|---|---|---|
+| 1 | New application | MVP | 2026-10-01 | 2026-10-10 | Released |
+| 2 | Bug fix | BUG-1 | 2026-10-11 | | |
+
+## Approvals
+| Gate | Iteration | Decision | Given by | Date | Covers |
+|---|---|---|---|---|---|
+| A1 scope | 1 | Approved | User, in chat | 2026-10-01 | US-1 |
+| A2 design | 1 | Rejected: too dark | User, in chat | 2026-10-02 | spec |
+| A2 design | 1 | Approved | alex via ClickUp | 2026-10-03 | spec |
+| A3 release | 1 | Approved with changes | User, in chat | 2026-10-05 | 1.0.0 |
+| UAT | 1 | Approved | User, in chat | 2026-10-06 | 1.0.0 |
+| Must not verifiable | 1 | Accepted | User | 2026-10-04 | NFR-2 |
+
+## Decisions and answers
+`;
+    const g = M.approvals(status);
+    ok(g.A1.firstTime === 1 && g.A2.decided === 1 && g.A2.firstTime === 0 && g.A2.rejected === 1 && g.A3.withChanges === 1 && g.UAT.firstTime === 1 && Object.keys(g).length === 4, "approvals count first answers per gate and iteration", JSON.stringify(g));
+    ok(M.iterations(status).length === 2 && M.iterations(status)[1].type === "Bug fix", "the Iterations table is read");
+    ok(M.decisionKind("approve with changes") === "changes" && M.decisionKind("Rejected") === "rejected" && M.decisionKind("Accepted") === "other", "decision words are classified");
+
+    const events = [
+      { event: "run", agentId: "a", agent: "scene-developer", cards: ["US-1"], iteration: 2, phase: "3", status: "completed", tokens: 1000, durationMs: 60000, toolUses: 3, at: "1" },
+      { event: "stop", agentId: "a", agent: "scene-developer", at: "2" },
+      { event: "run", agentId: "b", agent: "scene-developer", cards: ["US-1"], iteration: 2, phase: "3", status: "async_launched", tokens: null, background: true, at: "3" },
+      { event: "stop", agentId: "b", agent: "scene-developer", at: "4" },
+      { event: "run", agentId: "c", agent: "qa-engineer", cards: ["US-1"], iteration: 2, phase: "4", status: "completed", tokens: 500, at: "5" },
+      { event: "run", agentId: "d", agent: "qa-engineer", cards: ["US-1"], iteration: 2, phase: "4", status: "completed", tokens: 500, at: "6" },
+    ];
+    const runs = M.mergeRuns(events);
+    ok(runs.length === 4, "a run and its stop event count once", JSON.stringify(runs));
+    const t = M.agentTelemetry(runs);
+    ok(t.agents["scene-developer"].runs === 2 && t.agents["scene-developer"].tokens === 1000 && t.agents["scene-developer"].tokensUnknown === 1, "unknown token totals are counted, not guessed", JSON.stringify(t.agents));
+    ok(t.repeats.length === 1 && t.repeats[0].agent === "scene-developer" && t.repeats[0].runs === 2, "repeat delegations leave out phase 4 regression runs", JSON.stringify(t.repeats));
+    const parsedRuns = M.parseRuns('{"agent":"x","event":"run"}\nnot json\n\n[1]\n');
+    ok(parsedRuns.events.length === 1 && parsedRuns.bad === 2, "bad run log lines are skipped and counted");
+
+    // The command, with no tracker set up
+    const mp = makeProject();
+    writeFileSync(join(mp, "docs", "project-status.md"), status);
+    mkdirSync(join(mp, "docs", "metrics"), { recursive: true });
+    mkdirSync(join(mp, "docs", "incidents"), { recursive: true });
+    writeFileSync(join(mp, "docs", "incidents", "INC-1.md"), "# INC-1: Model fails\n\nSeverity: sev2\nStatus: resolved\nRelease: 1.1.0\nIntroduced in: 1.0.0\nDetected: 2026-10-11 09:00 AEDT\nMitigated: 2026-10-11 10:00 AEDT\n");
+    writeFileSync(join(mp, "docs", "metrics", "runs.jsonl"), events.map((e) => JSON.stringify(e)).join("\n") + "\nbroken\n");
+    writeFileSync(join(mp, "docs", "metrics", "runs-2026-01-01T09-30-00.jsonl"), JSON.stringify({ event: "run", agentId: "old", agent: "architect", tokens: 7, at: "0" }) + "\n");
+    let r = await run(mp, ["metrics", "--print"]);
+    ok(/needs a tracker \(`local` is enough\)/.test(r.out), "without a tracker the report says why no releases show", r.out);
+    ok(r.code === 0 && /No tracker is set up/.test(r.out) && /\| A2 \| 1 \| 0 \| 0 \| 1 \|/.test(r.out) && /\| architect \| 1 \| 7 \|/.test(r.out) && /1 line\(s\) of the run log could not be read/.test(r.out), "metrics prints without a tracker, reading rotated logs", r.out);
+    ok(/1 h \(n=1\)/.test(r.out) && /No releases are recorded/.test(r.out) && !/\$|USD|dollar/i.test(r.out), "metrics reports time to restore and no money figures", r.out);
+    ok(!existsSync(join(mp, "docs", "metrics", "report.md")), "--print writes nothing");
+    r = await run(mp, ["metrics"]);
+    ok(r.code === 0 && existsSync(join(mp, "docs", "metrics", "report.md")) && /# Delivery metrics/.test(readFileSync(join(mp, "docs", "metrics", "report.md"), "utf8")), "metrics writes docs/metrics/report.md", r.out);
   }
 
 } finally {

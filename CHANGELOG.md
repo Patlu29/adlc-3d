@@ -2,6 +2,27 @@
 
 All notable changes to this plugin. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the plugin uses [semantic versioning](https://semver.org/). Release notes with upgrade steps are on the [releases page](https://github.com/Patlu29/adlc-3d/releases).
 
+## [4.3.0] - 2026-11-27
+
+### Added
+- **Agent run log.** A new hook records every delegation to one of the plugin's agents in `docs/metrics/runs.jsonl`: agent, cards, iteration and phase (from the delegation prompt's `Cards:` and `Iteration and phase:` lines), model, tokens, time, tool uses and status. It never stores the prompt or the reply, never blocks and never prints. Background runs are logged when launched and when they stop. `Metrics: off` in the state file stops it
+- **`metrics` tracker command.** Writes `docs/metrics/report.md` (or prints it with `--print`), with or without a tracker: cycle and lead time, sprint history, the DORA measures approximated from the project's records (releases shipped, cycle time to ship, change failure rate, time to restore), gate decisions approved at the first answer, bugs, and agent runs, tokens and time per agent and per iteration, with repeat delegations listed. Every median shows its n, rates appear from five shipped releases, and no money figures are given
+- **Autonomy by iteration type.** `Autonomy: Bug fix=Autonomous, approved by the user on <date>` in the state file gives an iteration type its own approval mode. It applies when an iteration opens, only the user sets it, and floors always stop for the user: type changes, a bug fix that needs Plan or Design, incidents, auth, secrets, dependencies, migrations, `.github/`, any security finding, UAT and every deploy or push. A sev1 or sev2 caused by a release resets lighter modes to Key gates
+- **Behaviour evals** in `evals/` for `claude plugin eval`: status is read only, Autonomous mode still asks before deploying, an incident asks before a rollback, a defect report opens a Bug fix iteration, build stops at approval A1, and the guard stops the Write and Edit tools creating a `.env` file. Cases share a scaffolded fixture project with a stand-in deploy script, and graders check tool calls and files before an LLM judge is used
+- Incident files gain `Mitigated:`, `Resolved:` and `Introduced in:` lines, the last set in the postmortem to the release that caused the fault
+
+### Changed
+- Phase 7 regenerates the metrics report and quotes three figures in the retrospective
+- The Approvals table's Decision column uses exactly Approved, Approved with changes or Rejected: <reason>, one row per decision
+- The architect's scaffold adds `.gitattributes` with a union merge for the run log
+- `docs/metrics/` is Tech Lead only, and like `docs/tracker/` it is left out of the approval fingerprint, so a logged run never makes a ClickUp approval stale
+- History entries the tracker fills in (cards from before 4.1, cards joining a sprint with no history) are marked synthetic and left out of flow metrics
+- The validator checks the eval cases and the new tracker and hook files
+- Tests: 182 tracker checks and 108 hook checks
+
+### Upgrading
+- Nothing to do. Existing projects start logging agent runs on the next delegation; add `Metrics: off` to `docs/project-status.md` to opt out. Existing projects may want `docs/metrics/runs.jsonl merge=union` in `.gitattributes`
+
 ## [4.2.0] - 2026-11-25
 
 ### Added

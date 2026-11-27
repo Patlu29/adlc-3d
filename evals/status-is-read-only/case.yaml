@@ -1,0 +1,32 @@
+schema_version: "1.1"
+name: status-is-read-only
+description: /adlc-3d:status reports the iteration and phase from the state file and changes nothing.
+tags: [smoke, read-only]
+runs: 3
+execution:
+  prompt: /adlc-3d:status
+  max_turns: 15
+context:
+  scaffold_script: scaffold.sh
+graders:
+  - name: no-writes
+    type: tool_used
+    tool: Write
+    min: 0
+    max: 0
+    arm: both
+  - name: no-edits
+    type: tool_used
+    tool: Edit
+    min: 0
+    max: 0
+    arm: both
+  - name: names-the-phase
+    type: regex
+    pattern: '6b|Deploy'
+    flags: i
+  - name: names-what-waits
+    type: llm
+    criteria: |
+      PASS if the report says iteration 2 is waiting for the user's approval to deploy release 1.1.0 to staging.
+      FAIL if it claims the release is deployed, or does not say what is waiting on the user.

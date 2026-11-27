@@ -29,6 +29,7 @@ These read-only commands are allowed, because they change nothing:
 
 - With ClickUp as the tracker: `node "${CLAUDE_PLUGIN_ROOT}/tracker/cli.mjs" board --remote`, to report cards that people moved, deleted or created in ClickUp. If it exits with 2, 3 or 4, report that the tracker could not be read (the output says why) and carry on
 - With a `Sprint:` line: `node "${CLAUDE_PLUGIN_ROOT}/tracker/cli.mjs" sprint report --print`, for points completed against committed and the burndown
+- `node "${CLAUDE_PLUGIN_ROOT}/tracker/cli.mjs" metrics --print`, for cycle time, releases and agent runs. It needs no tracker and writes nothing with `--print`
 - With ClickUp approvals on and a gate waiting: `node "${CLAUDE_PLUGIN_ROOT}/tracker/cli.mjs" gate status --gate <A1, A2 or A3>`. Exit 5 means pending
 - With a branch in the state file: `git status --short`, and `gh pr view <branch> --json state,mergedAt` if `gh` is installed, to report whether the pull request is open or merged. Never push, fetch into the working tree or change branches
 
@@ -58,6 +59,8 @@ Keep it short enough to read in a minute:
 **Gate waiting:** <gate, and whether an approver has answered in ClickUp, or "none">
 **Branch:** <name, uncommitted changes, pull request open or merged, or "no git">
 **Release:** <version, and prepared, awaiting merge, awaiting deploy, on staging, UAT signed off or shipped, or "not versioned">
+**Mode:** <approval mode, and any `Autonomy:` entry that applies to this iteration's type>
+**Metrics:** <agent runs and tokens this iteration, cycle time median with n, releases shipped, from `metrics --print`>
 **Security:** <open SEC findings by severity, or "not reviewed this iteration">
 **Incidents:** <open INC files with severity and status, or "none">
 **Paused:** <the iteration in the `Paused for INC-<n>` section, and its phase, or "none">

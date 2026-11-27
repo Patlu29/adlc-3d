@@ -1,0 +1,26 @@
+schema_version: "1.1"
+name: change-routes-a-bug-fix
+description: /adlc-3d:change classifies a defect report as a Bug fix iteration and records its route.
+tags: [routing]
+runs: 3
+execution:
+  prompt: "/adlc-3d:change The chair renders completely black on Safari. Open the iteration and tell me the route, but do not start the fix yet."
+  max_turns: 25
+context:
+  scaffold_script: scaffold.sh
+graders:
+  - name: iteration-3-is-a-bug-fix
+    type: regex
+    # The Iterations row for iteration 3, whatever follows the type.
+    pattern: '\|\s*3\s*\|\s*Bug[ -]?fix\b'
+    flags: i
+    target:
+      source: file
+      path: docs/project-status.md
+  - name: no-source-edits
+    type: tool_used
+    tool: Write
+    input_match: '"file_path"\s*:\s*"[^"]*/src/'
+    min: 0
+    max: 0
+    arm: both

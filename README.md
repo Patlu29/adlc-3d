@@ -108,6 +108,7 @@ From 3.2.0 the plugin ships two hooks that run on every Write and Edit while the
 - **They act only inside an ADLC project:** a folder whose root has `docs/project-status.md`. Your other projects are untouched. Before the Plan phase creates that file, nothing is guarded
 - **They never approve anything.** They can only block a write (before it) or add a warning (after it), so your own permission prompts still apply
 - **They fail open.** If Node is missing, the input is unexpected or a hook errors or takes more than 5 seconds, the write goes ahead
+- **One hook only records.** From 4.3.0 a run log hook notes each delegation to one of the plugin's agents (agent, cards, iteration and phase, tokens, time and tool uses, never the prompt or reply) in `docs/metrics/runs.jsonl`. Add `Metrics: off` to `docs/project-status.md` to stop it
 - **They cover shell commands only for ClickUp.** A Bash hook blocks adding approvers, calling the ClickUp API directly and reading the token or webhook URLs. An agent could still write a file through Bash; the agents are told not to, and the pipeline's secret scan is the backstop
 
 To switch them off for one project, add a line `Hooks: off` to `docs/project-status.md`. To switch them off for a session, start Claude Code with `ADLC3D_HOOKS=off`.
@@ -172,6 +173,14 @@ From 4.2.0:
 - **Security engineer.** Threat models the design and reviews security before release whenever auth, uploads, data, headers, dependencies or third-party hosts change, and always for a new app
 - **Incidents.** `/adlc-3d:incident` records the fault in `docs/incidents/INC-<n>.md`, triages severity (sev1 and sev2 always stop for you), mitigates with your approval for each rollback or deploy, fixes the cause in a hotfix iteration that pauses any open one, and ends with a blameless postmortem whose actions go to the backlog
 
+## Metrics, autonomy and evals
+
+From 4.3.0:
+
+- **Metrics.** The tracker's `metrics` command writes `docs/metrics/report.md`: cycle and lead time from the cards' state history, the four DORA measures as far as the project's records allow (releases shipped, cycle time to ship, change failure rate from each incident's `Introduced in:` line, time to restore from `Detected:` to `Mitigated:`), gate decisions approved at the first answer, bugs, and agent runs with tokens and time per agent and per iteration. It runs without a tracker, but releases and card history are recorded only with one (`local` is enough), so without a tracker the flow and release figures stay empty. Every figure shows how many items it rests on, and rates appear from five releases. Tokens are reported, not money, because prices depend on your plan
+- **Autonomy by iteration type.** You can give some iteration types a lighter mode than the rest, for example `Autonomy: Bug fix=Autonomous`. Floors still apply: type changes, auth, secrets, dependencies, `.github/`, any security finding, incidents, UAT and every deploy or push always stop for you, and a sev1 or sev2 caused by a release resets lighter modes to Key gates
+- **Behaviour evals.** `evals/` holds cases for `claude plugin eval` that check the plugin keeps its promises: status changes nothing, Autonomous mode still asks before deploying, an incident asks before a rollback, a defect report opens a Bug fix iteration, build stops at scope approval, and the guard stops the Write and Edit tools creating a `.env` file (the no-plugin arm creates it)
+
 ## Branches and pull requests
 
 If you agree to commits at the start, the Tech Lead:
@@ -208,9 +217,10 @@ Alongside the application code, each project gets:
 agents/           one file per agent
 skills/           one folder per skill; build, change and status are the commands,
                   and lifecycle is the rulebook they load
-hooks/            hooks.json, the guard and review hooks, and their shared ownership map and secret patterns
-tracker/          the tracker command: ClickUp client, document parser, card registry and board
+hooks/            hooks.json, the guard, review and run log hooks, and their shared ownership map and secret patterns
+tracker/          the tracker command: ClickUp client, document parser, card registry, board, sprints and metrics
 scripts/          validate-plugin.mjs, test-hooks.mjs and test-tracker.mjs
+evals/            behaviour eval cases for claude plugin eval, with a shared fixture project
 ```
 
 After any change, run the validator and the hook tests. The validator checks frontmatter, that every skill an agent preloads exists, that references to agents and skills resolve, that the lifecycle names every phase and agent, that the hooks point at real scripts and agents, that the governance files exist, and that the manifest versions and changelog match:
@@ -228,6 +238,8 @@ node scripts/test-tracker.mjs
 ```
 
 The tracker tests run the command against a mock of the ClickUp API, so they need no ClickUp account.
+
+The behaviour evals run real sessions on your own Claude credential, so they cost money and are not run in CI. `CONTRIBUTING.md` has the command.
 
 See `CONTRIBUTING.md` for the branch, versioning and release process, and `SECURITY.md` to report a vulnerability. The plugin is proprietary; see `LICENSE`.
 

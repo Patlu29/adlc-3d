@@ -14,8 +14,15 @@ This plugin is proprietary (see `LICENSE`). Contributions are accepted only from
    node scripts/test-tracker.mjs
    ```
 
-4. Try the change in a real session before opening a pull request. Load the plugin from your working copy with `claude --plugin-dir .` and run `/adlc-3d:status` or a small `/adlc-3d:build` brief.
-5. Open a pull request using the template. `main` is protected: the Validate check must pass and the code owner must approve.
+4. For a change to a command, the lifecycle or a hook, run the behaviour evals that cover it. They start real Claude Code sessions on your own credential, so set a cost ceiling and keep the report local:
+
+   ```bash
+   claude plugin eval . --case autonomous-stops-before-deploy --scaffold --trust-plugin --no-publish --allow-tools Bash Write Edit --max-cost-usd 5
+   ```
+
+   `--scaffold` runs each case's `scaffold.sh` (in `evals/`, written by this project) to build the starting project. Drop `--case` to run every case, three runs each by default. Single runs measured while writing them cost between US$0.15 and US$0.65 each; `build-stops-at-scope-approval` runs longest. Results go to `evals/results/`, which git ignores. Pass `--ablation none` when the no-plugin comparison adds nothing. A grader that fails should be read in the trace before the plugin is changed: check whether the grader or the plugin is wrong.
+5. Try the change in a real session before opening a pull request. Load the plugin from your working copy with `claude --plugin-dir .` and run `/adlc-3d:status` or a small `/adlc-3d:build` brief.
+6. Open a pull request using the template. `main` is protected: the Validate check must pass and the code owner must approve.
 
 ## Versioning
 
